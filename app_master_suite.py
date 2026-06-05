@@ -19,7 +19,7 @@ SECRET_PASSCODE = "Frank_BattleSimulator"
 st.set_page_config(page_title="FRANK-Optimizer Master Suite", layout="wide")
 
 # ... inside the unlocked application section ...
-st.title("FRANK-Optimizer: Strategic Intelligence Core")
+st.title("FRANK-Optimizer: Kingshot Battle Simulator and Optimizer")
 st.caption("Combat Logistics &  Battle Math Matrix.")
 
 if "authenticated" not in st.session_state:
@@ -86,7 +86,10 @@ else:
     # =========================================================================
     # =========================================================================
     with tab_sim:
-        st.markdown("""
+
+
+        with st.expander(" Multi-Rally Simulator Quick-Start FAQ", expanded=False):
+          st.markdown("""
             * **How do I configure heroes and widgets?** Select the precise Main Leaders and Supporter/Joiner heroes for each wave. Enter the exact widget levels (0–10) to compute independent combat multipliers natively.
             * **How should I input troop sizes?** You can toggle between typing in **Raw Counts** manually or using **Rally Size + Ratios**. When using ratios, use the interactive grid to type or micro-adjust percentages—they must sum to exactly 100% to run.
             * **How do I handle Troop Tier and TG Level?** Check your battle report, calculate or read the average troop tier and TG level of the actual march or structure, and match those dropdowns here to align base health/defense levels.
