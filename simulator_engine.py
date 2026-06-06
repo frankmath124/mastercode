@@ -201,18 +201,23 @@ def apply_skill(skill, mods):
     sk_type = skill.get('type')
     val = skill.get('val', 0.0)
     
-    if sk_type == 'atk':             mods.atk += val
-    elif sk_type == 'defense':       mods.def_val += val
-    elif sk_type == 'lethality':     mods.leth += val
-    elif sk_type == 'health':        mods.hp += val
-    elif sk_type == 'dmg':           mods.dmg += val
-    elif sk_type == 'dmg_reduction': mods.reduct -= val
-    elif sk_type == 'dodge':         mods.dodge += val
+    # --- Additive Core Stats ---
+    if sk_type == 'atk':               mods.atk += val
+    elif sk_type == 'defense':         mods.def_val += val
+    elif sk_type == 'lethality':       mods.leth += val
+    elif sk_type == 'health':          mods.hp += val
+    elif sk_type == 'dmg':             mods.dmg += val
     elif sk_type == 'enemy_leth_down': mods.enemy_leth_down += val
-    elif sk_type == 'enemy_dmg_down':  mods.enemy_dmg_down += val
     elif sk_type == 'enemy_taken_up':  mods.enemy_taken_up += val
-    elif sk_type == 'dodge_chance':    mods.dodge += val
-    elif sk_type == 'proc':          mods.procs.append(skill)
+    
+    # --- Multiplicative Mitigations (Diminishing Returns) ---
+    elif sk_type == 'dmg_reduction':   mods.reduct *= (1.0 - val)
+    elif sk_type == 'enemy_dmg_down':  mods.enemy_dmg_down = 1.0 - ((1.0 - mods.enemy_dmg_down) * (1.0 - val))
+    elif sk_type in ['dodge', 'dodge_chance']: 
+        mods.dodge = 1.0 - ((1.0 - mods.dodge) * (1.0 - val))
+        
+    # --- Special Mechanics ---
+    elif sk_type == 'proc':            mods.procs.append(skill)
     elif sk_type == 'class_dmg_buff':
         if not hasattr(mods, 'class_dmg'): mods.class_dmg = np.ones(3)
         mods.class_dmg += np.array(skill['buffs'])
@@ -221,6 +226,7 @@ def apply_skill(skill, mods):
         mods.class_atk_mod[skill['target_class']] += val
     elif sk_type == 'timed_shield':
         mods.procs.append(skill)
+        
     return mods
 
 # =========================================================================
