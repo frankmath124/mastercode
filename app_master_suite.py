@@ -563,22 +563,50 @@ else:
                         elif opt_side == "Attacker Waves (Rallies)" and "Supporter Heroes" in opt_mode:
                             combos = list(itertools.combinations_with_replacement(opt_hero_pool, 4))
                             g_setup = TroopSide([o_g_inf, o_g_cav, o_g_arc], o_g_combat_stats, [o_g_lead1, o_g_lead2, o_g_lead3], o_g_sup_heroes, o_g_tier, o_g_tg, o_g_widgets)
+                            
                             for combo in combos:
                                 w_set = build_waves_opt(wave_1_override_heroes=list(combo))
-                                tot_surv = sum(np.sum(kingshot_multirally_sim2(copy.deepcopy(w_set), copy.deepcopy(g_setup))[0].troops) for _ in range(o_mc_runs))
-                                avg_surv = tot_surv / o_mc_runs
-                                results_grid.append({"Configuration": f"Wave 1 -> {', '.join(combo)}", "Avg Survivors": avg_surv, "Rate": (avg_surv / max(1, o_g_total_troops)) * 100})
+                                g_surv_sum = 0
+                                a_surv_sum = 0
+                                
+                                for _ in range(o_mc_runs):
+                                    final_g, logs = kingshot_multirally_sim2(copy.deepcopy(w_set), copy.deepcopy(g_setup))
+                                    g_surv_sum += np.sum(final_g.troops)
+                                    # Track how many attackers survived the bloodbath
+                                    a_surv_sum += sum(np.sum(log['attacker_surviving']) for log in logs)
+                                    
+                                avg_g_surv = g_surv_sum / o_mc_runs
+                                avg_a_surv = a_surv_sum / o_mc_runs
+                                
+                                results_grid.append({
+                                    "Configuration": f"Wave 1 -> {', '.join(combo)}", 
+                                    "Avg Survivors": avg_g_surv, 
+                                    "Attacker Retained": avg_a_surv, # New Metric
+                                    "Rate": (avg_g_surv / max(1, o_g_total_troops)) * 100
+                                })
 
+                        # --- UPDATED SORTING LOGIC ---
                         if opt_side == "Garrison (Defenders)":
-                            sorted_results = sorted(results_grid, key=lambda x: x["Avg Survivors"], reverse=True)
-                            st.success(" GARRISON OPTIMIZATION COMPLETE")
+                            # Primary: Maximize Garrison Survival. Secondary: Minimize Attacker Survival
+                            sorted_results = sorted(results_grid, key=lambda x: (x["Avg Survivors"], -x.get("Attacker Retained", 0)), reverse=True)
+                            st.success("🏰 GARRISON OPTIMIZATION COMPLETE")
                         else:
-                            sorted_results = sorted(results_grid, key=lambda x: x["Avg Survivors"], reverse=False)
-                            st.success("ATTACKER OPTIMIZATION COMPLETE")
+                            # Primary: Minimize Garrison Survival (0 is best). Secondary: Maximize Attacker Retention
+                            sorted_results = sorted(results_grid, key=lambda x: (x["Avg Survivors"], -x.get("Attacker Retained", 0)), reverse=False)
+                            st.success("🔥 ATTACKER OPTIMIZATION COMPLETE")
 
-                        st.markdown("### Top 5 Matrix Configurations")
+                        st.markdown("### 🏆 Top 5 Matrix Configurations")
                         top_5 = sorted_results[:5]
-                        f_top_5 = [{"Rank": i+1, "Configuration": r["Configuration"], "Garrison Survivors (Avg)": f"{r['Avg Survivors']:,.0f}", "Garrison Survival Rate %": f"{r['Rate']:.1f}%"} for i, r in enumerate(top_5)]
+                        
+                        # Add the new column to the display table
+                        f_top_5 = [{
+                            "Rank": i+1, 
+                            "Configuration": r["Configuration"], 
+                            "Garrison Survivors": f"{r['Avg Survivors']:,.0f}", 
+                            "Attacker Survivors": f"{r.get('Attacker Retained', 0):,.0f}", # Reveal the Tie-Breaker
+                            "Survival Rate %": f"{r['Rate']:.1f}%"
+                        } for i, r in enumerate(top_5)]
+                        
                         st.table(f_top_5)
             else:
                 st.button("Run Optimization Engine Grid Search", disabled=True, key="o_run_disabled")
