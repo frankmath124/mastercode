@@ -65,6 +65,7 @@ class CombatMods:
         self.dodge = 0.0
         self.enemy_leth_down = 0.0
         self.enemy_dmg_down = 0.0
+        self.enemy_atk_down = 0.0
         self.enemy_taken_up = 0.0
         self.procs = []
 
