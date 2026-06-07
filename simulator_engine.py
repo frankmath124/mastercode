@@ -176,7 +176,10 @@ def load_hero_db():
         'skill1': {'type': 'lethality', 'val': 0.25}, 'skill2': {'type': 'dmg', 'val': 0.00}, 'skill3': {'type': 'health', 'val': 0.15}, 'widget': {'has_widget': False}
     }
     db['Howard'] = {
-        'skill1': {'type': 'health', 'val': 0.15}, 'skill2': {'type': 'dmg_reduction', 'val': 0.10}, 'skill3': {'type': 'defense', 'val': 0.20}, 'widget': {'has_widget': False}
+        'skill1': {'type': 'dmg_reduction', 'val': 0.20}, 
+        'skill2': {'type': 'enemy_atk_down', 'val': 0.20}, 
+        'skill3': {'type': 'none'}, 
+        'widget': {'has_widget': False}
     }
     db['Amane'] = {
         'skill1': {'type': 'atk', 'val': 0.25},
@@ -208,6 +211,7 @@ def apply_skill(skill, mods):
     elif sk_type == 'health':          mods.hp += val
     elif sk_type == 'dmg':             mods.dmg += val
     elif sk_type == 'enemy_leth_down': mods.enemy_leth_down += val
+    elif sk_type == 'enemy_atk_down':  mods.enemy_atk_down += val
     elif sk_type == 'enemy_taken_up':  mods.enemy_taken_up += val
     
     # --- Multiplicative Mitigations (Diminishing Returns) ---
@@ -292,15 +296,15 @@ def kingshot_multirally_sim2(rally_waves, garrison, max_rounds=200):
         eff_a_stats = true_base_stats * (1.0 + attacker.stats / 100.0)
         eff_d_stats = true_base_stats * (1.0 + current_garrison.stats / 100.0)
         
-        # Symmetrical Multiplicative Application
-        eff_a_stats[:, 0] *= a_mods.atk
+# Symmetrical Multiplicative Application
+        eff_a_stats[:, 0] *= max(0.1, a_mods.atk - d_mods.enemy_atk_down)   # Debuffed by Defender
         eff_a_stats[:, 1] *= a_mods.def_val
-        eff_a_stats[:, 2] *= max(0.1, a_mods.leth - d_mods.enemy_leth_down) # Debuffed by Defender
+        eff_a_stats[:, 2] *= max(0.1, a_mods.leth - d_mods.enemy_leth_down) 
         eff_a_stats[:, 3] *= a_mods.hp
         
-        eff_d_stats[:, 0] *= d_mods.atk
+        eff_d_stats[:, 0] *= max(0.1, d_mods.atk - a_mods.enemy_atk_down)   # Debuffed by Attacker
         eff_d_stats[:, 1] *= d_mods.def_val * garrison_fortification
-        eff_d_stats[:, 2] *= max(0.1, d_mods.leth - a_mods.enemy_leth_down) # Debuffed by Attacker
+        eff_d_stats[:, 2] *= max(0.1, d_mods.leth - a_mods.enemy_leth_down) 
         eff_d_stats[:, 3] *= d_mods.hp * garrison_fortification
         
         a_troops = np.copy(attacker.troops)
