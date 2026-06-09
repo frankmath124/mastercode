@@ -318,7 +318,8 @@ else:
                 o_g_lead2 = o_hc2.selectbox("Cavalry Hero", cavalry_heroes, index=0, key="o_gl2")
                 o_g_wid2 = o_wc2.number_input("W2", 0, 10, 10, key="o_gw2")
                 o_hc3, o_wc3 = st.columns([3, 1])
-                o_g_lead3 = o_hc3.selectbox("Archer Hero", archer_heroes, index=0, key="o_gw3")
+# Safely mapped to "o_gl3"
+                o_g_lead3 = o_hc3.selectbox("Archer Hero", archer_heroes, index=0, key="o_gl3") 
                 o_g_wid3 = o_wc3.number_input("W3", 0, 10, 10, key="o_gw3")
                 st.markdown("---")
                 if opt_side == "Garrison (Defenders)" and "Supporter Heroes" in opt_mode:
