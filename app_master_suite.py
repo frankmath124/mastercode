@@ -4,10 +4,8 @@ import copy
 import itertools
 from simulator_engine import kingshot_multirally_sim2, TroopSide, load_hero_db
 
-# Helper to calculate widget expedition bonus based on even-level steps
 def get_widget_bonus(level):
-    if level == 0:
-        return 0.0
+    if level == 0: return 0.0
     even_level = (level // 2) * 2
     return 2.5 + (even_level / 2) * 2.5
 
@@ -57,18 +55,13 @@ if "authenticated" not in st.session_state:
 if not st.session_state["authenticated"]:
     st.title("🔒 Security Access Required")
     user_input = st.text_input("Enter Alliance Passcode:", type="password")
-    
     if st.button("Unlock Command Suite"):
         if user_input == SECRET_PASSCODE:
             st.session_state["authenticated"] = True
-            st.session_state["joiner_filter_enabled"] = True  # Initialize default state
             st.rerun()
         else:
             st.error("Invalid passcode. Access denied.")
 else:
-    # =========================================================================
-    # --- MASTER MODULE CORE CONFIGURATIONS ---
-    # =========================================================================
     hero_db = load_hero_db()
     hero_list = ["None"] + sorted(list(hero_db.keys()))
     
@@ -76,55 +69,27 @@ else:
     cavalry_heroes = ["None"] + sorted(["Gordon", "Fahd", "Chenko", "Petra", "Hilde", "Jabel", "Margot"])
     archer_heroes = ["None"] + sorted(["Jaegar", "Marlin", "Saul", "Yaenwoo", "Amane", "Quinn", "Rosa"])
     
-    # --- SYSTEM PERFORMANCE OPTIMIZATION SIDEBAR ---
     st.sidebar.markdown("## ⚙️ Calculation Engine Controls")
-    filter_duplicates = st.sidebar.toggle(
-        "Condense Support Permanent Pools", 
-        value=True, 
-        help="Filters redundant support variants (e.g. keeping only Howard to represent identical Fahd/Quinn math loops). Massive grid search execution speed gains."
-    )
+    filter_duplicates = st.sidebar.toggle("Condense Support Permanent Pools", value=True)
     
     if filter_duplicates:
-        # Condense the pool down to unique skill archetypes
         joiner_pool_defaults = ["Howard", "Chenko", "Gordon", "Amane"]
     else:
         joiner_pool_defaults = [h for h in hero_list if h != "None" and not hero_db[h].get('widget', {}).get('has_widget', True)]
         if not joiner_pool_defaults:
             joiner_pool_defaults = ["Gordon", "Fahd", "Chenko", "Yaenwoo", "Howard", "Quinn", "Amane"]
 
-    # =========================================================================
-    # --- MASTER HEADERS & SYSTEM DESCRIPTIONS ---
-    # =========================================================================
-    st.caption("A comprehensive combat environment simulator driven by predictive derivative matrix loops and stochastic Monte Carlo modeling.")
-    
     if st.sidebar.button("Lock Command Suite"):
         st.session_state["authenticated"] = False
         st.rerun()
 
-    with st.expander(" Module Descriptions", expanded=False):
-        col_desc1, col_desc2, col_desc3 = st.columns(3)
-        with col_desc1:
-            st.markdown("### Multi-Rally Simulator")
-            st.write("Simulate consecutive rally waves hitting a fixed structure. Evaluates sequential attrition, troop depletion curves, and step-by-step win conditions.")
-        with col_desc2:
-            st.markdown("### Tactical Optimizer")
-            st.write("Run brute-force grid searches across continuous loops to calculate best performance for troop compositions or optimal joiner heroes.")
-        with col_desc3:
-            st.markdown("### Stat Optimizer Engine")
-            st.write("Isolate variables by injecting small stat changes. Calculates exactly how many fewer troop deaths an upgrade prevents to provide upgrade guidance.")
-
-    tab_sim, tab_opt, tab_roi = st.tabs([
-        "Multi-Rally Simulator", 
-        "Battle Optimizer", 
-        "Stat Improvement Optimizer"
-    ])
+    tab_sim, tab_opt, tab_roi = st.tabs(["Multi-Rally Simulator", "Battle Optimizer", "Stat Improvement Optimizer"])
 
     # =========================================================================
     # --- TAB 1: MULTI-RALLY SIMULATOR ---
     # =========================================================================
     with tab_sim:
         st.header("Sequential Multi-Rally Wave Simulation")
-        
         c1, c2, _ = st.columns([1, 1, 2])
         if c1.button("📋 Copy Profile to Clipboard", key="s_copy"):
             copy_to_clipboard('s')
@@ -132,10 +97,8 @@ else:
         if c2.button("📥 Paste Profile from Clipboard", key="s_paste"):
             paste_from_clipboard('s')
             st.rerun()
-        st.markdown("---")
         
         sim_main, sim_side = st.columns([2, 1])
-        
         with sim_side:
             st.subheader("Garrison Target Defenses")
             s_gc1, s_gc2 = st.columns(2)
@@ -146,28 +109,27 @@ else:
             if s_g_input_style == "Raw Counts":
                 s_g_inf = st.number_input("Garrison Infantry Count", value=1500000, key="s_gi")
                 s_g_cav = st.number_input("Garrison Cavalry Count", value=500000, key="s_gc")
-                s_g_arc = st.number_input("Garrison Archer Count", value=800000, key=f"s_ga")
+                s_g_arc = st.number_input("Garrison Archer Count", value=800000, key="s_ga")
                 s_g_valid = True
             else:
                 s_g_total_troops = st.number_input("Total Garrison Capacity Target", value=2800000, step=100000, key="s_gtot")
                 s_g_df = [{"Class": "Infantry", "Ratio %": 50}, {"Class": "Cavalry", "Ratio %": 20}, {"Class": "Archer", "Ratio %": 30}]
-                s_edited_g_df = st.data_editor(s_g_df, column_config={"Class": st.column_config.TextColumn("Class", disabled=True), "Ratio %": st.column_config.NumberColumn("Ratio %", min_value=0, max_value=100, step=1, format="%d%%")}, disabled=["Class"], hide_index=True, key="s_g_ratio_editor")
+                s_edited_g_df = st.data_editor(s_g_df, column_config={"Ratio %": st.column_config.NumberColumn("Ratio %", min_value=0, max_value=100, step=1, format="%d%%")}, disabled=["Class"], hide_index=True, key="s_g_ratio_editor")
                 s_g_total_pct = sum(row["Ratio %"] for row in s_edited_g_df)
                 s_g_valid = s_g_total_pct == 100
-                if not s_g_valid: st.error(f"❌ Garrison ratios must sum to 100% (Current: {s_g_total_pct}%).")
                 s_g_inf = int(s_g_total_troops * (s_edited_g_df[0]["Ratio %"] / 100.0))
                 s_g_cav = int(s_g_total_troops * (s_edited_g_df[1]["Ratio %"] / 100.0))
                 s_g_arc = int(s_g_total_troops * (s_edited_g_df[2]["Ratio %"] / 100.0))
                 
             with st.expander("Garrison Command Heroes"):
                 s_hc1, s_wc1 = st.columns([3, 1])
-                s_g_lead1 = s_hc1.selectbox("Infantry Hero", infantry_heroes, index=infantry_heroes.index("Amadeus") if "Amadeus" in infantry_heroes else 0, key="s_gl1")
+                s_g_lead1 = s_hc1.selectbox("Infantry Hero", infantry_heroes, index=0, key="s_gl1")
                 s_g_wid1 = s_wc1.number_input("W1", 0, 10, 10, key="s_gw1")
                 s_hc2, s_wc2 = st.columns([3, 1])
-                s_g_lead2 = s_hc2.selectbox("Cavalry Hero", cavalry_heroes, index=cavalry_heroes.index("Hilde") if "Hilde" in cavalry_heroes else 0, key="s_gl2")
+                s_g_lead2 = s_hc2.selectbox("Cavalry Hero", cavalry_heroes, index=0, key="s_gl2")
                 s_g_wid2 = s_wc2.number_input("W2", 0, 10, 10, key="s_gw2")
                 s_hc3, s_wc3 = st.columns([3, 1])
-                s_g_lead3 = s_hc3.selectbox("Archer Hero", archer_heroes, index=archer_heroes.index("Marlin") if "Marlin" in archer_heroes else 0, key="s_gl3")
+                s_g_lead3 = s_hc3.selectbox("Archer Hero", archer_heroes, index=0, key="s_gl3")
                 s_g_wid3 = s_wc3.number_input("W3", 0, 10, 10, key="s_gw3")
                 st.markdown("---")
                 s_g_sup1 = st.selectbox("Supporter 1", hero_list, index=0, key="s_gs1")
@@ -200,11 +162,9 @@ else:
                 with tab:
                     sw_col1, sw_col2 = st.columns(2)
                     with sw_col1:
-                        st.markdown("**Wave Base Metrics**")
                         swc1, swc2 = st.columns(2)
                         sw_tier = swc1.selectbox("Troop Tier", range(1, 12), index=9, key=f"s_wtier_{i}") 
                         sw_tg = swc2.selectbox("Troop TG Level", range(0, 6), index=5, key=f"s_wtg_{i}")       
-                        
                         sw_input_style = st.radio("Troop Input Type", ("Raw Counts", "Rally Size + Ratios"), key=f"s_wstyle_{i}")
                         if sw_input_style == "Raw Counts":
                             sa_inf = st.number_input("Infantry Count", value=600000, key=f"s_winf_{i}")
@@ -214,10 +174,9 @@ else:
                         else:
                             sa_total_capacity = st.number_input("Rally Size Capacity Limit", value=1000000, step=50000, key=f"s_wcap_{i}")
                             sw_df = [{"Class": "Infantry", "Ratio %": 60}, {"Class": "Cavalry", "Ratio %": 20}, {"Class": "Archer", "Ratio %": 20}]
-                            s_edited_w_df = st.data_editor(sw_df, column_config={"Class": st.column_config.TextColumn("Class", disabled=True), "Ratio %": st.column_config.NumberColumn("Ratio %", min_value=0, max_value=100, step=1, format="%d%%")}, disabled=["Class"], hide_index=True, key=f"s_w_ratio_editor_{i}")
+                            s_edited_w_df = st.data_editor(sw_df, column_config={"Ratio %": st.column_config.NumberColumn("Ratio %", min_value=0, max_value=100, step=1, format="%d%%")}, disabled=["Class"], hide_index=True, key=f"s_w_ratio_editor_{i}")
                             sw_total_pct = sum(row["Ratio %"] for row in s_edited_w_df)
                             st.session_state[f"s_wvalid_{i}"] = sw_total_pct == 100
-                            if sw_total_pct != 100: st.error(f"❌ Wave {i+1} ratios must equal 100%.")
                             sa_inf = int(sa_total_capacity * (s_edited_w_df[0]["Ratio %"] / 100.0))
                             sa_cav = int(sa_total_capacity * (s_edited_w_df[1]["Ratio %"] / 100.0))
                             sa_arc = int(sa_total_capacity * (s_edited_w_df[2]["Ratio %"] / 100.0))
@@ -270,11 +229,9 @@ else:
             
             if s_all_waves_valid and s_g_valid:
                 if st.button("Run Multi-Rally Simulation Sequence", key="s_run_btn"):
-                    with st.spinner("Processing continuous battlefield math blocks..."):
+                    with st.spinner("Processing battlefield math blocks..."):
                         s_g_combat_stats = [[s_gia, s_gid, s_gil, s_gih], [s_gca, s_gcd, s_gcl, s_gch], [s_gaa, s_gad, s_gal, s_gah]]
-                        s_g_widgets = [s_g_wid1, s_g_wid2, s_g_wid3, 0, 0, 0, 0]
-                        
-                        garrison_setup = TroopSide([s_g_inf, s_g_cav, s_g_arc], np.array(s_g_combat_stats), [s_g_lead1, s_g_lead2, s_g_lead3], [s_g_sup1, s_g_sup2, s_g_sup3, s_g_sup4], s_g_tier, s_g_tg, s_g_widgets)
+                        garrison_setup = TroopSide([s_g_inf, s_g_cav, s_g_arc], np.array(s_g_combat_stats), [s_g_lead1, s_g_lead2, s_g_lead3], [s_g_sup1, s_g_sup2, s_g_sup3, s_g_sup4], s_g_tier, s_g_tg, [s_g_wid1, s_g_wid2, s_g_wid3, 0, 0, 0, 0])
                         
                         rally_waves_input = []
                         for wave_idx in range(s_num_waves):
@@ -290,7 +247,6 @@ else:
                             t_garrison = copy.deepcopy(garrison_setup)
                             t_waves = copy.deepcopy(rally_waves_input)
                             final_g, logs = kingshot_multirally_sim2(t_waves, t_garrison)
-                            
                             g_surv_total += np.sum(final_g.troops)
                             g_breakdown_avg += final_g.troops
                             for step_idx, log in enumerate(logs):
@@ -304,28 +260,13 @@ else:
                         st.success("Simulation Sequence Complete!")
                         if avg_g_surv <= 0: st.markdown("### STATUS: <span style='color:red'>GARRISON COMPLETELY BROKEN</span>", unsafe_allow_html=True)
                         else: st.markdown(f"### STATUS: <span style='color:green'>GARRISON HELD (Avg. {avg_g_surv:,.0f} Total Troops Left)</span>", unsafe_allow_html=True)
-                        
-                        out_col1, out_col2 = st.columns(2)
-                        with out_col1:
-                            st.markdown("#### Final Defense Status")
-                            st.table({"Troop Class": ["Infantry", "Cavalry", "Archers", "Total Remaining"], "Remaining (Avg)": [f"{avg_g_breakdown[0]:,.0f}", f"{avg_g_breakdown[1]:,.0f}", f"{avg_g_breakdown[2]:,.0f}", f"{avg_g_surv:,.0f}"]})
-                        with out_col2:
-                            st.markdown("#### Attacker Wave Performance")
-                            w_perf_display = []
-                            for w_idx in range(s_num_waves):
-                                avg_w_surv = w_surv_tracking[w_idx] / s_runs
-                                win_pct = (w_win_counts[w_idx] / s_runs) * 100
-                                w_perf_display.append({"Rally Wave": f"Wave #{w_idx + 1}", "T-Level": f"T{s_wave_configs[w_idx]['tier']} TG{s_wave_configs[w_idx]['tg']}", "Win Rate %": f"{win_pct:.1f}%", "Avg Retained Troops": f"{avg_w_surv:,.0f}"})
-                            st.table(w_perf_display)
-            else:
-                st.button("Run Multi-Rally Simulation Sequence", disabled=True, key="s_run_disabled", help="Resolve validation errors to run.")
+                        st.table({"Troop Class": ["Infantry", "Cavalry", "Archers", "Total Remaining"], "Remaining (Avg)": [f"{avg_g_breakdown[0]:,.0f}", f"{avg_g_breakdown[1]:,.0f}", f"{avg_g_breakdown[2]:,.0f}", f"{avg_g_surv:,.0f}"]})
 
     # =========================================================================
     # --- TAB 2: TACTICAL OPTIMIZER ---
     # =========================================================================
     with tab_opt:
         st.header("Multi-Rally Optimization Engine")
-        
         c1, c2, _ = st.columns([1, 1, 2])
         if c1.button("📋 Copy Profile to Clipboard", key="o_copy"):
             copy_to_clipboard('o')
@@ -333,25 +274,19 @@ else:
         if c2.button("📥 Paste Profile from Clipboard", key="o_paste"):
             paste_from_clipboard('o')
             st.rerun()
-        st.markdown("---")
         
         opt_main, opt_side_col = st.columns([2, 1])
-        
         with opt_side_col:
             st.header("Garrison Setup")
-            st.markdown("**Garrison Base Troop Level**")
             o_gc1, o_gc2 = st.columns(2)
             o_g_tier = o_gc1.selectbox("Garrison Troop Tier", range(1, 12), index=10, key="o_gtier") 
             o_g_tg = o_gc2.selectbox("Garrison Troop TG Level", range(0, 6), index=5, key="o_gtg")       
-            st.markdown("---")
             
-            st.markdown("### Select Optimization Options")
             opt_side = st.radio("Step 1: Choose strategy track:", ("Garrison (Defenders)", "Attacker Waves (Rallies)"), key="opt_side_sel")
             if opt_side == "Garrison (Defenders)":
                 opt_mode = st.selectbox("Step 2: Choose target variable:", ["Troop Ratios (Fixed Total Count)", "Supporter Heroes (Fixed Troop Count)"], key="opt_mode_g")
             else:
                 opt_mode = st.selectbox("Step 2: Choose target variable:", ["Attacker Wave #1 Troop Ratios", "Attacker Wave #1 Supporter Heroes"], key="opt_mode_a")
-            st.markdown("---")
             
             if opt_side == "Garrison (Defenders)" and "Troop Ratios" in opt_mode:
                 o_g_total_troops = st.number_input("Total Garrison Capacity", value=2800000, step=100000, key="o_gtot")
@@ -368,33 +303,32 @@ else:
                 else:
                     o_g_total_troops = st.number_input("Total Garrison Capacity Target", value=2800000, step=100000, key="o_gtot")
                     o_g_df = [{"Class": "Infantry", "Ratio %": 50}, {"Class": "Cavalry", "Ratio %": 20}, {"Class": "Archer", "Ratio %": 30}]
-                    o_edited_g_df = st.data_editor(o_g_df, column_config={"Class": st.column_config.TextColumn("Class", disabled=True), "Ratio %": st.column_config.NumberColumn("Ratio %", min_value=0, max_value=100, step=1, format="%d%%")}, disabled=["Class"], hide_index=True, key="o_g_ratio_editor")
+                    o_edited_g_df = st.data_editor(o_g_df, column_config={"Ratio %": st.column_config.NumberColumn("Ratio %", min_value=0, max_value=100, step=1, format="%d%%")}, disabled=["Class"], hide_index=True, key="o_g_ratio_editor")
                     o_g_total_pct = sum(row["Ratio %"] for row in o_edited_g_df)
                     o_g_valid = o_g_total_pct == 100
-                    if not o_g_valid: st.error(f"❌ Garrison ratios must sum to 100%.")
                     o_g_inf = int(o_g_total_troops * (o_edited_g_df[0]["Ratio %"] / 100.0))
                     o_g_cav = int(o_g_total_troops * (o_edited_g_df[1]["Ratio %"] / 100.0))
                     o_g_arc = int(o_g_total_troops * (o_edited_g_df[2]["Ratio %"] / 100.0))
 
-            with st.expander("Garrison Heroes"):
-                r_hc1, r_wc1 = st.columns([3, 1])
-                r_g_lead1 = r_hc1.selectbox("Infantry Hero", infantry_heroes, index=infantry_heroes.index("Amadeus") if "Amadeus" in infantry_heroes else 0, key="r_gl1")
-                r_g_wid1 = r_wc1.number_input("W1", 0, 10, 10, key="r_gw1") # <-- Change key to "r_gw1"
-                r_hc2, r_wc2 = st.columns([3, 1])
-                r_g_lead2 = r_hc2.selectbox("Cavalry Hero", cavalry_heroes, index=cavalry_heroes.index("Hilde") if "Hilde" in cavalry_heroes else 0, key="r_gl2")
-                r_g_wid2 = r_wc2.number_input("W2", 0, 10, 10, key="r_gw2") # <-- Change key to "r_gw2"
-                r_hc3, r_wc3 = st.columns([3, 1])
-                r_g_lead3 = r_hc3.selectbox("Archer Hero", archer_heroes, index=archer_heroes.index("Marlin") if "Marlin" in archer_heroes else 0, key="r_gw3")
-                r_g_wid3 = r_wc3.number_input("W3", 0, 10, 10, key="r_gw3") # <-- Change key to "r_gw3"
+            with st.expander("Garrison Heroes and Joiners"):
+                o_hc1, o_wc1 = st.columns([3, 1])
+                o_g_lead1 = o_hc1.selectbox("Infantry Hero", infantry_heroes, index=0, key="o_gl1")
+                o_g_wid1 = o_wc1.number_input("W1", 0, 10, 10, key="o_gw1")
+                o_hc2, o_wc2 = st.columns([3, 1])
+                o_g_lead2 = o_hc2.selectbox("Cavalry Hero", cavalry_heroes, index=0, key="o_gl2")
+                o_g_wid2 = o_wc2.number_input("W2", 0, 10, 10, key="o_gw2")
+                o_hc3, o_wc3 = st.columns([3, 1])
+                o_g_lead3 = o_hc3.selectbox("Archer Hero", archer_heroes, index=0, key="o_gw3")
+                o_g_wid3 = o_wc3.number_input("W3", 0, 10, 10, key="o_gw3")
                 st.markdown("---")
                 if opt_side == "Garrison (Defenders)" and "Supporter Heroes" in opt_mode:
                     opt_hero_pool = st.multiselect("Joiner Pool Options", hero_list, default=joiner_pool_defaults, key="o_pool")
                     o_g_sup_heroes = [] 
                 else:
-                    o_g_sup1 = st.selectbox("Supporter 1", hero_list, index=hero_list.index(joiner_pool_defaults[0]) if joiner_pool_defaults else 0, key="o_gs1")
-                    o_g_sup2 = st.selectbox("Supporter 2", hero_list, index=hero_list.index(joiner_pool_defaults[0]) if joiner_pool_defaults else 0, key="o_gs2")
-                    o_g_sup3 = st.selectbox("Supporter 3", hero_list, index=hero_list.index(joiner_pool_defaults[0]) if joiner_pool_defaults else 0, key="o_gs3")
-                    o_g_sup4 = st.selectbox("Supporter 4", hero_list, index=hero_list.index(joiner_pool_defaults[0]) if joiner_pool_defaults else 0, key="o_gs4")
+                    o_g_sup1 = st.selectbox("Supporter 1", hero_list, index=0, key="o_gs1")
+                    o_g_sup2 = st.selectbox("Supporter 2", hero_list, index=0, key="o_gs2")
+                    o_g_sup3 = st.selectbox("Supporter 3", hero_list, index=0, key="o_gs3")
+                    o_g_sup4 = st.selectbox("Supporter 4", hero_list, index=0, key="o_gs4")
                     o_g_sup_heroes = [o_g_sup1, o_g_sup2, o_g_sup3, o_g_sup4]
                     
             with st.expander("Target Garrison Combat Stats"):
@@ -425,10 +359,7 @@ else:
                         owc1, owc2 = st.columns(2)
                         ow_tier = owc1.selectbox("Troop Tier", range(1, 12), index=9, key=f"o_wtier_{i}") 
                         ow_tg = owc2.selectbox("Troop TG Level", range(0, 6), index=5, key=f"o_wtg_{i}")       
-                        st.markdown("---")
-                        
                         if opt_side == "Attacker Waves (Rallies)" and "Troop Ratios" in opt_mode and i == 0:
-                            st.info("**Wave 1 Troop Ratios are locked for continuous loop optimization.**")
                             ow_total_capacity = st.number_input("Rally Size Capacity Limit", value=1000000, step=50000, key=f"o_wcap_{i}")
                             oa_inf, oa_cav, oa_arc = 0, 0, 0
                             st.session_state[f"o_wvalid_{i}"] = True
@@ -442,10 +373,9 @@ else:
                             else:
                                 ow_total_capacity = st.number_input("Rally Size Capacity Limit", value=1000000, step=50000, key=f"o_wcap_{i}")
                                 ow_df = [{"Class": "Infantry", "Ratio %": 60}, {"Class": "Cavalry", "Ratio %": 20}, {"Class": "Archer", "Ratio %": 20}]
-                                o_edited_w_df = st.data_editor(ow_df, column_config={"Class": st.column_config.TextColumn("Class", disabled=True), "Ratio %": st.column_config.NumberColumn("Ratio %", min_value=0, max_value=100, step=1, format="%d%%")}, disabled=["Class"], hide_index=True, key=f"o_w_ratio_editor_{i}")
+                                o_edited_w_df = st.data_editor(ow_df, column_config={"Ratio %": st.column_config.NumberColumn("Ratio %", min_value=0, max_value=100, step=1, format="%d%%")}, disabled=["Class"], hide_index=True, key=f"o_w_ratio_editor_{i}")
                                 ow_total_pct = sum(row["Ratio %"] for row in o_edited_w_df)
                                 st.session_state[f"o_wvalid_{i}"] = ow_total_pct == 100
-                                if ow_total_pct != 100: st.error(f"❌ Wave {i+1} ratios must equal 100%.")
                                 oa_inf = int(ow_total_capacity * (o_edited_w_df[0]["Ratio %"] / 100.0))
                                 oa_cav = int(ow_total_capacity * (o_edited_w_df[1]["Ratio %"] / 100.0))
                                 oa_arc = int(ow_total_capacity * (o_edited_w_df[2]["Ratio %"] / 100.0))
@@ -506,7 +436,6 @@ else:
                     with st.spinner("Processing Continuous Mathematical Strategy Grids..."):
                         o_g_widgets = [o_g_wid1, o_g_wid2, o_g_wid3, 0, 0, 0, 0]
                         o_g_combat_stats = [[o_gia, o_gid, o_gil, o_gih], [o_gca, o_gcd, o_gcl, o_gch], [o_gaa, o_gad, o_gal, o_gah]]
-                        
                         results_grid = []
                         ratio_grid = [(i/10.0, j/10.0, (10-i-j)/10.0) for i in range(11) for j in range(11-i)]
                         
@@ -553,55 +482,25 @@ else:
                         elif opt_side == "Attacker Waves (Rallies)" and "Supporter Heroes" in opt_mode:
                             combos = list(itertools.combinations_with_replacement(opt_hero_pool, 4))
                             g_setup = TroopSide([o_g_inf, o_g_cav, o_g_arc], np.array(o_g_combat_stats), [o_g_lead1, o_g_lead2, o_g_lead3], o_g_sup_heroes, o_g_tier, o_g_tg, o_g_widgets)
-                            
                             for combo in combos:
                                 w_set = build_waves_opt(wave_1_override_heroes=list(combo))
-                                g_surv_sum = 0
-                                a_surv_sum = 0
-                                
+                                g_surv_sum, a_surv_sum = 0, 0
                                 for _ in range(o_mc_runs):
                                     final_g, logs = kingshot_multirally_sim2(copy.deepcopy(w_set), copy.deepcopy(g_setup))
                                     g_surv_sum += np.sum(final_g.troops)
                                     a_surv_sum += sum(np.sum(log['attacker_surviving']) for log in logs)
-                                    
                                 avg_g_surv = g_surv_sum / o_mc_runs
                                 avg_a_surv = a_surv_sum / o_mc_runs
-                                
-                                results_grid.append({
-                                    "Configuration": f"Wave 1 -> {', '.join(combo)}", 
-                                    "Avg Survivors": avg_g_surv, 
-                                    "Attacker Retained": avg_a_surv,
-                                    "Rate": (avg_g_surv / max(1, o_g_total_troops)) * 100
-                                })
+                                results_grid.append({"Configuration": f"Wave 1 -> {', '.join(combo)}", "Avg Survivors": avg_g_surv, "Attacker Retained": avg_a_surv, "Rate": (avg_g_surv / max(1, o_g_total_troops)) * 100})
 
-                        if opt_side == "Garrison (Defenders)":
-                            sorted_results = sorted(results_grid, key=lambda x: (x["Avg Survivors"], -x.get("Attacker Retained", 0)), reverse=True)
-                            st.success("🏰 GARRISON OPTIMIZATION COMPLETE")
-                        else:
-                            sorted_results = sorted(results_grid, key=lambda x: (x["Avg Survivors"], -x.get("Attacker Retained", 0)), reverse=False)
-                            st.success("🔥 ATTACKER OPTIMIZATION COMPLETE")
-
-                        st.markdown("### 🏆 Top 5 Matrix Configurations")
-                        top_5 = sorted_results[:5]
-                        
-                        f_top_5 = [{
-                            "Rank": i+1, 
-                            "Configuration": r["Configuration"], 
-                            "Garrison Survivors": f"{r['Avg Survivors']:,.0f}", 
-                            "Attacker Survivors": f"{r.get('Attacker Retained', 0):,.0f}",
-                            "Survival Rate %": f"{r['Rate']:.1f}%"
-                        } for i, r in enumerate(top_5)]
-                        
-                        st.table(f_top_5)
-            else:
-                st.button("Run Optimization Engine Grid Search", disabled=True, key="o_run_disabled")
+                        sorted_results = sorted(results_grid, key=lambda x: (x["Avg Survivors"], -x.get("Attacker Retained", 0)), reverse=(opt_side == "Garrison (Defenders)"))
+                        st.table([{ "Rank": i+1, "Configuration": r["Configuration"], "Garrison Survivors": f"{r['Avg Survivors']:,.0f}", "Survival Rate %": f"{r['Rate']:.1f}%" } for i, r in enumerate(sorted_results[:5])])
 
     # =========================================================================
     # --- TAB 3: STAT ROI ENGINE ---
     # =========================================================================
     with tab_roi:
         st.header("Multi-Variable Stat Optimizer")
-        
         c1, c2, _ = st.columns([1, 1, 2])
         if c1.button("📋 Copy Profile to Clipboard", key="r_copy"):
             copy_to_clipboard('r')
@@ -609,45 +508,40 @@ else:
         if c2.button("📥 Paste Profile from Clipboard", key="r_paste"):
             paste_from_clipboard('r')
             st.rerun()
-        st.markdown("---")
         
         roi_main, roi_side_col = st.columns([2, 1])
-        
         with roi_side_col:
             st.header("Baseline Profile Setup")
             r_gc1, r_gc2 = st.columns(2)
             r_g_tier = r_gc1.selectbox("Garrison Troop Tier", range(1, 12), index=10, key="r_gtier") 
             r_g_tg = r_gc2.selectbox("Garrison Troop TG Level", range(0, 6), index=5, key="r_gtg")       
-            st.markdown("---")
             
             r_g_input_style = st.radio("Garrison Troop Input Type", ("Raw Counts", "Capacity + Ratios"), key="r_g_style")
             if r_g_input_style == "Raw Counts":
                 r_g_inf = st.number_input("Garrison Infantry Count", value=1500000, key="r_gi")
                 r_g_cav = st.number_input("Garrison Cavalry Count", value=500000, key="r_gc")
                 r_g_arc = st.number_input("Garrison Archer Count", value=800000, key="r_ga")
-                r_g_total_troops = r_g_inf + r_g_cav + r_g_arc
                 r_g_valid = True
             else:
                 r_g_total_troops = st.number_input("Total Garrison Capacity Target", value=2800000, step=100000, key="r_gtot")
                 r_g_df = [{"Class": "Infantry", "Ratio %": 50}, {"Class": "Cavalry", "Ratio %": 20}, {"Class": "Archer", "Ratio %": 30}]
-                r_edited_g_df = st.data_editor(r_g_df, column_config={"Class": st.column_config.TextColumn("Class", disabled=True), "Ratio %": st.column_config.NumberColumn("Ratio %", min_value=0, max_value=100, step=1, format="%d%%")}, disabled=["Class"], hide_index=True, key="r_g_ratio_editor")
+                r_edited_g_df = st.data_editor(r_g_df, column_config={"Ratio %": st.column_config.NumberColumn("Ratio %", min_value=0, max_value=100, step=1, format="%d%%")}, disabled=["Class"], hide_index=True, key="r_g_ratio_editor")
                 r_g_total_pct = sum(row["Ratio %"] for row in r_edited_g_df)
                 r_g_valid = r_g_total_pct == 100
-                if not r_g_valid: st.error(f"❌ Garrison ratios must sum to 100%.")
                 r_g_inf = int(r_g_total_troops * (r_edited_g_df[0]["Ratio %"] / 100.0))
                 r_g_cav = int(r_g_total_troops * (r_edited_g_df[1]["Ratio %"] / 100.0))
                 r_g_arc = int(r_g_total_troops * (r_edited_g_df[2]["Ratio %"] / 100.0))
 
             with st.expander("Garrison Heroes"):
                 r_hc1, r_wc1 = st.columns([3, 1])
-                r_g_lead1 = r_hc1.selectbox("Infantry Hero", infantry_heroes, index=infantry_heroes.index("Amadeus") if "Amadeus" in infantry_heroes else 0, key="r_gl1")
-                r_g_wid1 = r_wc1.number_input("W1", 0, 10, 10, key="r_gw1")
+                r_g_lead1 = r_hc1.selectbox("Infantry Hero", infantry_heroes, index=0, key="r_gl1")
+                r_g_wid1 = r_wc1.number_input("W1", 0, 10, 10, key="r_gw1") # Prefixed safely to r_
                 r_hc2, r_wc2 = st.columns([3, 1])
-                r_g_lead2 = r_hc2.selectbox("Cavalry Hero", cavalry_heroes, index=cavalry_heroes.index("Hilde") if "Hilde" in cavalry_heroes else 0, key="r_gl2")
-                r_g_wid2 = r_wc2.number_input("W2", 0, 10, 10, key="r_gw2")
+                r_g_lead2 = r_hc2.selectbox("Cavalry Hero", cavalry_heroes, index=0, key="r_gl2")
+                r_g_wid2 = r_wc2.number_input("W2", 0, 10, 10, key="r_gw2") # Prefixed safely to r_
                 r_hc3, r_wc3 = st.columns([3, 1])
-                r_g_lead3 = r_hc3.selectbox("Archer Hero", archer_heroes, index=archer_heroes.index("Marlin") if "Marlin" in archer_heroes else 0, key="r_gw3")
-                r_g_wid3 = r_wc3.number_input("W3", 0, 10, 10, key="r_gw3")
+                r_g_lead3 = r_hc3.selectbox("Archer Hero", archer_heroes, index=0, key="r_gl3")
+                r_g_wid3 = r_wc3.number_input("W3", 0, 10, 10, key="r_gw3") # Prefixed safely to r_
                 st.markdown("---")
                 r_g_sup1 = st.selectbox("Supporter 1", hero_list, index=0, key="r_gs1")
                 r_g_sup2 = st.selectbox("Supporter 2", hero_list, index=0, key="r_gs2")
@@ -667,7 +561,7 @@ else:
                 st.markdown("---")
                 r_gaa = st.number_input("Arc Atk %", value=850.0, key="r_gaa")
                 r_gad = st.number_input("Arc Def %", value=800.0, key="r_gad")
-                r_gal = st.number_input("Arc Let %", value=1100.0, key="r_gal")
+                r_gal = st.number_input("Arc Let %", value=1100.0, key="w_gal")
                 r_gah = st.number_input("Arc HP %", value=1000.0, key="r_gah")
 
         with roi_main:
@@ -688,7 +582,6 @@ else:
                         rwc1, rwc2 = st.columns(2)
                         rw_tier = rwc1.selectbox("Troop Tier", range(1, 12), index=9, key=f"r_wtier_{i}")
                         rw_tg = rwc2.selectbox("Troop TG Level", range(0, 6), index=5, key=f"r_wtg_{i}")
-                        
                         rw_input_style = st.radio("Troop Input Type", ("Raw Counts", "Rally Size + Ratios"), key=f"r_wstyle_{i}")
                         if rw_input_style == "Raw Counts":
                             ra_inf = st.number_input("Infantry Count", value=600000, key=f"r_winf_{i}")
@@ -698,10 +591,9 @@ else:
                         else:
                             ra_total_capacity = st.number_input("Rally Size Limit", value=1000000, step=50000, key=f"r_wcap_{i}")
                             rw_df = [{"Class": "Infantry", "Ratio %": 60}, {"Class": "Cavalry", "Ratio %": 20}, {"Class": "Archer", "Ratio %": 20}]
-                            r_edited_w_df = st.data_editor(rw_df, column_config={"Class": st.column_config.TextColumn("Class", disabled=True), "Ratio %": st.column_config.NumberColumn("Ratio %", min_value=0, max_value=100, step=1, format="%d%%")}, disabled=["Class"], hide_index=True, key=f"r_w_ratio_editor_{i}")
+                            r_edited_w_df = st.data_editor(rw_df, column_config={"Ratio %": st.column_config.NumberColumn("Ratio %", min_value=0, max_value=100, step=1, format="%d%%")}, disabled=["Class"], hide_index=True, key=f"r_w_ratio_editor_{i}")
                             rw_total_pct = sum(row["Ratio %"] for row in r_edited_w_df)
                             st.session_state[f"r_wvalid_{i}"] = rw_total_pct == 100
-                            if rw_total_pct != 100: st.error(f"❌ Wave {i+1} ratios must equal 100%.")
                             ra_inf = int(ra_total_capacity * (r_edited_w_df[0]["Ratio %"] / 100.0))
                             ra_cav = int(ra_total_capacity * (r_edited_w_df[1]["Ratio %"] / 100.0))
                             ra_arc = int(ra_total_capacity * (r_edited_w_df[2]["Ratio %"] / 100.0))
@@ -748,7 +640,7 @@ else:
             
             if r_all_waves_valid and r_g_valid:
                 if st.button(" Run Comprehensive Stat Optimization Analysis", key="r_run_btn"):
-                    with st.spinner("Calculating control baseline and spawning stat derivative testing loops..."):
+                    with st.spinner("Calculating control baseline and spawning stat testing loops..."):
                         r_g_widgets = [r_g_wid1, r_g_wid2, r_g_wid3, 0, 0, 0, 0]
                         r_g_sups = [r_g_sup1, r_g_sup2, r_g_sup3, r_g_sup4]
                         
@@ -759,7 +651,6 @@ else:
                         
                         baseline_stats = [[r_gia, r_gid, r_gil, r_gih], [r_gca, r_gcd, r_gcl, r_gch], [r_gaa, r_gad, r_gal, r_gah]]
                         control_garrison = TroopSide([r_g_inf, r_g_cav, r_g_arc], np.array(baseline_stats), [r_g_lead1, r_g_lead2, r_g_lead3], r_g_sups, r_g_tier, r_g_tg, r_g_widgets)
-                        
                         control_surv_total = sum(np.sum(kingshot_multirally_sim2(copy.deepcopy(rally_waves_input), copy.deepcopy(control_garrison))[0].troops) for _ in range(r_mc_runs))
                         control_avg = control_surv_total / r_mc_runs
                         
@@ -774,7 +665,6 @@ else:
                             nudged_stats = copy.deepcopy(baseline_stats)
                             nudged_stats[row][col] += nudge_val
                             
-                            # CRITICAL FIX: Wrapped inside np.array() to maintain strict type definitions across background deepcopies
                             test_garrison = TroopSide([r_g_inf, r_g_cav, r_g_arc], np.array(nudged_stats), [r_g_lead1, r_g_lead2, r_g_lead3], r_g_sups, r_g_tier, r_g_tg, r_g_widgets)
                             test_surv_total = sum(np.sum(kingshot_multirally_sim2(copy.deepcopy(rally_waves_input), copy.deepcopy(test_garrison))[0].troops) for _ in range(r_mc_runs))
                             test_avg = test_surv_total / r_mc_runs
@@ -784,11 +674,4 @@ else:
                             
                         sorted_roi = sorted(roi_leaderboard, key=lambda x: x["Avg Saved Troops"], reverse=True)
                         st.success("Optimization Analysis Grid Processing Completed!")
-                        st.subheader("Upgrade Efficiency Leaderboard")
-                        
-                        display_board = []
-                        for rank, entry in enumerate(sorted_roi):
-                            display_board.append({"Rank": rank + 1, "Stat Node Upgrade": f"Add +{nudge_val}% {entry['Metric Target']}", "Fewer Troops Dead (Avg)": f"{entry['Avg Saved Troops']:,.0f}", "Casualty Deflection Delta": f"+{entry['Casualty Reduction %']:.3f}%"})
-                        st.table(display_board)
-            else:
-                st.button("Run Comprehensive Stat ROI Analysis", disabled=True, key="r_run_disabled")
+                        st.table([{ "Rank": rank + 1, "Stat Node Upgrade": f"Add +{nudge_val}% {entry['Metric Target']}", "Fewer Troops Dead (Avg)": f"{entry['Avg Saved Troops']:,.0f}", "Casualty Deflection Delta": f"+{entry['Casualty Reduction %']:.3f}%" } for rank, entry in enumerate(sorted_roi)])
