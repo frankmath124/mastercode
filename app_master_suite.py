@@ -376,16 +376,16 @@ else:
                     o_g_cav = int(o_g_total_troops * (o_edited_g_df[1]["Ratio %"] / 100.0))
                     o_g_arc = int(o_g_total_troops * (o_edited_g_df[2]["Ratio %"] / 100.0))
 
-            with st.expander("Garrison Heroes and Joiners"):
-                o_hc1, o_wc1 = st.columns([3, 1])
-                o_g_lead1 = o_hc1.selectbox("Infantry Hero", infantry_heroes, index=infantry_heroes.index("Amadeus") if "Amadeus" in infantry_heroes else 0, key="o_gl1")
-                o_g_wid1 = o_wc1.number_input("W1", 0, 10, 10, key="o_gw1")
-                o_hc2, o_wc2 = st.columns([3, 1])
-                o_g_lead2 = o_hc2.selectbox("Cavalry Hero", cavalry_heroes, index=cavalry_heroes.index("Hilde") if "Hilde" in cavalry_heroes else 0, key="o_gl2")
-                o_g_wid2 = o_wc2.number_input("W2", 0, 10, 10, key="o_gw2")
-                o_hc3, o_wc3 = st.columns([3, 1])
-                o_g_lead3 = o_hc3.selectbox("Archer Hero", archer_heroes, index=archer_heroes.index("Marlin") if "Marlin" in archer_heroes else 0, key="o_gw3")
-                o_g_wid3 = o_wc3.number_input("W3", 0, 10, 10, key="o_gw3")
+            with st.expander("Garrison Heroes"):
+                r_hc1, r_wc1 = st.columns([3, 1])
+                r_g_lead1 = r_hc1.selectbox("Infantry Hero", infantry_heroes, index=infantry_heroes.index("Amadeus") if "Amadeus" in infantry_heroes else 0, key="r_gl1")
+                r_g_wid1 = r_wc1.number_input("W1", 0, 10, 10, key="r_gw1") # <-- Change key to "r_gw1"
+                r_hc2, r_wc2 = st.columns([3, 1])
+                r_g_lead2 = r_hc2.selectbox("Cavalry Hero", cavalry_heroes, index=cavalry_heroes.index("Hilde") if "Hilde" in cavalry_heroes else 0, key="r_gl2")
+                r_g_wid2 = r_wc2.number_input("W2", 0, 10, 10, key="r_gw2") # <-- Change key to "r_gw2"
+                r_hc3, r_wc3 = st.columns([3, 1])
+                r_g_lead3 = r_hc3.selectbox("Archer Hero", archer_heroes, index=archer_heroes.index("Marlin") if "Marlin" in archer_heroes else 0, key="r_gw3")
+                r_g_wid3 = r_wc3.number_input("W3", 0, 10, 10, key="r_gw3") # <-- Change key to "r_gw3"
                 st.markdown("---")
                 if opt_side == "Garrison (Defenders)" and "Supporter Heroes" in opt_mode:
                     opt_hero_pool = st.multiselect("Joiner Pool Options", hero_list, default=joiner_pool_defaults, key="o_pool")
