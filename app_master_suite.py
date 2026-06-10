@@ -25,19 +25,16 @@ def scan_battle_report_side_by_side(image_file):
     img_width = image_np.shape[1]
     midpoint = img_width / 2
     
-    # Detail=1 gives us coordinates [[x_min, y_min], [x_max, y_max]] and the string text
+    # Detail=1 gives coordinates so we can split Left/Right
     results = reader.readtext(image_np, detail=1) 
     
-    # Dictionaries to hold our sorted string lines
     left_strings = []
     right_strings = []
     
     for bbox, text, prob in results:
         text_clean = text.lower().strip()
-        # Find the center horizontal point of this text block
         text_x_center = (bbox[0][0] + bbox[1][0]) / 2 
         
-        # Sort based on screen layout
         if text_x_center < midpoint:
             left_strings.append(text_clean)
         else:
@@ -46,32 +43,30 @@ def scan_battle_report_side_by_side(image_file):
     left_text_block = " ".join(left_strings)
     right_text_block = " ".join(right_strings)
     
-    # Share the core stat dictionary labels
+    # Map for regex hunting
     labels_map = {
-        'ia': 'infantry attack', 'id': 'infantry defense', 'il': 'infantry lethality', 'ih': 'infantry health',
-        'ca': 'cavalry attack', 'cd': 'cavalry defense', 'cl': 'cavalry lethality', 'ch': 'cavalry health',
-        'aa': 'archer attack',  'ad': 'archer defense',  'al': 'archer lethality',  'ah': 'archer health'
+        'ia': r'infantry\s*attack', 'id': r'infantry\s*defense', 'il': r'infantry\s*lethality', 'ih': r'infantry\s*health',
+        'ca': r'cavalry\s*attack',  'cd': r'cavalry\s*defense',  'cl': r'cavalry\s*lethality',  'ch': r'cavalry\s*health',
+        'aa': r'archer\s*attack',   'ad': r'archer\s*defense',   'al': r'archer\s*lethality',   'ah': r'archer\s*health'
     }
     
-    left_stats = {}
-    right_stats = {}
+    left_stats, right_stats = {}, {}
     
-    # Scan both sides independently
     for key, phrase in labels_map.items():
-        # Look for numbers anywhere near or after the stat keyword names
-        # Match matches numbers with decimals or percentages like "+858.7%" or "1260.7%"
-        left_match = re.search(rf'{phrase}.*?([\d\.]+)', left_text_block)
-        if left_match:
-            try: left_stats[key] = float(left_match.group(1))
+        # Hunts for numbers, allowing for commas and plus signs (e.g. "+ 1,050.5%")
+        pattern = phrase + r'.*?[\+\s]*([\d\.,]+)'
+        
+        l_match = re.search(pattern, left_text_block)
+        if l_match:
+            try: left_stats[key] = float(l_match.group(1).replace(',', ''))
             except: pass
             
-        right_match = re.search(rf'{phrase}.*?([\d\.]+)', right_text_block)
-        if right_match:
-            try: right_stats[key] = float(right_match.group(1))
+        r_match = re.search(pattern, right_text_block)
+        if r_match:
+            try: right_stats[key] = float(r_match.group(1).replace(',', ''))
             except: pass
             
     return left_stats, right_stats
-
 # =========================================================================
 # --- JSON FILE MANAGER ENGINE ---
 # =========================================================================
@@ -252,47 +247,44 @@ else:
                 
 # --- AUTO-SCAN BATTLE REPORT ---
     st.sidebar.markdown("---")
-    st.sidebar.markdown("### 📸 Auto-Scan Battle Report")
+    st.sidebar.markdown("### 📸 Dual-Column Battle Scanner")
     
-    # 1. Added "None" to the assignment options
     slot_options = ["None", "Garrison", "Wave 1", "Wave 2", "Wave 3", "Wave 4", "Wave 5"]
     
-    left_mapping = st.sidebar.selectbox("Assign LEFT Side To:", slot_options, index=2) # Wave 1
-    right_mapping = st.sidebar.selectbox("Assign RIGHT Side To:", slot_options, index=1) # Garrison
+    left_mapping = st.sidebar.selectbox("Assign LEFT Side To:", slot_options, index=2) # Default to Wave 1
+    right_mapping = st.sidebar.selectbox("Assign RIGHT Side To:", slot_options, index=1) # Default to Garrison
     
     ocr_upload = st.sidebar.file_uploader("Upload Screenshot", type=["png", "jpg", "jpeg"], key="dual_ocr_uploader")
     
     if ocr_upload is not None:
-        if st.sidebar.button(f"Extract & Apply", use_container_width=True, type="primary"):
-            with st.spinner("Neural Engine analyzing image..."):
+        if st.sidebar.button("Extract Data Columns", use_container_width=True, type="primary"):
+            with st.spinner("Splitting image layout matrices..."):
                 left_stats_found, right_stats_found = scan_battle_report_side_by_side(ocr_upload)
                 
                 def inject_side_data(scanned_pool, assignment_label):
                     if assignment_label == "None" or not scanned_pool: return 0
                     
                     is_wave = assignment_label.startswith("Wave")
-                    # If it's a wave, index is 0-4. If it's Garrison, we use 'g'
                     wave_idx = int(assignment_label.split(" ")[1]) - 1 if is_wave else 0
                     stat_mid = "" if is_wave else "g"
                     suffix = f"_{wave_idx}" if is_wave else ""
                     
                     count = 0
                     for k, v in scanned_pool.items():
-                        # io_prefix is 's', 'o', or 'r' depending on your top selector
                         target_key = f"{io_prefix}_{stat_mid}{k}{suffix}"
                         st.session_state[target_key] = v
                         count += 1
                     return count
 
-                # Process injection
+                # Process injection loops
                 l_count = inject_side_data(left_stats_found, left_mapping)
                 r_count = inject_side_data(right_stats_found, right_mapping)
                 
                 if l_count > 0 or r_count > 0:
-                    st.sidebar.success(f"Mapped: {left_mapping} -> {l_count} | {right_mapping} -> {r_count}")
+                    st.sidebar.success(f"Mapped: {left_mapping} -> {l_count}/12 | {right_mapping} -> {r_count}/12")
                     st.rerun()
                 else:
-                    st.sidebar.warning("No data mapped. Check if 'None' was selected or if scan failed.")
+                    st.sidebar.error("OCR ran, but failed to separate text nodes cleanly. Ensure you uploaded a stats page.")
 
     if st.sidebar.button("Lock Command Suite"):
         st.session_state["authenticated"] = False
