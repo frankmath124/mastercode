@@ -17,40 +17,73 @@ def load_ocr_reader():
     return easyocr.Reader(['en'], gpu=False)
 
 def scan_battle_report_side_by_side(image_file):
-    """Parses a side-by-side battle report screenshot into Left and Right stat pools."""
+    """Parses a side-by-side battle report using Y-coordinate row grouping."""
     reader = load_ocr_reader()
     
     image = Image.open(image_file)
     image_np = np.array(image)
-    img_width = image_np.shape[1]
-    midpoint = img_width / 2
+    midpoint = image_np.shape[1] / 2
     
-    # Detail=1 gives coordinates so we can split Left/Right
+    # Detail=1 gives coordinates so we can map rows precisely
     results = reader.readtext(image_np, detail=1) 
     
-    left_strings = []
-    right_strings = []
-    
+    blocks = []
     for bbox, text, prob in results:
-        text_clean = text.lower().strip()
-        text_x_center = (bbox[0][0] + bbox[1][0]) / 2 
+        y_center = (bbox[0][1] + bbox[2][1]) / 2
+        x_center = (bbox[0][0] + bbox[1][0]) / 2
+        blocks.append({'text': text.lower().strip(), 'x': x_center, 'y': y_center})
         
-        if text_x_center < midpoint:
-            left_strings.append(text_clean)
-        else:
-            right_strings.append(text_clean)
-            
-    left_text_block = " ".join(left_strings)
-    right_text_block = " ".join(right_strings)
+    # Sort all text blocks top-to-bottom
+    blocks.sort(key=lambda b: b['y'])
     
-    # Map for regex hunting
+    # Group text blocks into horizontal rows
+    rows = []
+    current_row = []
+    last_y = -100
+    for b in blocks:
+        if abs(b['y'] - last_y) > 20 and current_row:
+            rows.append(current_row)
+            current_row = []
+        current_row.append(b)
+        last_y = b['y']
+    if current_row: rows.append(current_row)
+        
+    left_stats, right_stats = {}, {}
+    
+    # Map for keyword hunting
     labels_map = {
-        'ia': r'infantry\s*attack', 'id': r'infantry\s*defense', 'il': r'infantry\s*lethality', 'ih': r'infantry\s*health',
-        'ca': r'cavalry\s*attack',  'cd': r'cavalry\s*defense',  'cl': r'cavalry\s*lethality',  'ch': r'cavalry\s*health',
-        'aa': r'archer\s*attack',   'ad': r'archer\s*defense',   'al': r'archer\s*lethality',   'ah': r'archer\s*health'
+        'ia': ['infantry', 'attack'], 'id': ['infantry', 'defense'], 'il': ['infantry', 'lethality'], 'ih': ['infantry', 'health'],
+        'ca': ['cavalry', 'attack'],  'cd': ['cavalry', 'defense'],  'cl': ['cavalry', 'lethality'],  'ch': ['cavalry', 'health'],
+        'aa': ['archer', 'attack'],   'ad': ['archer', 'defense'],   'al': ['archer', 'lethality'],   'ah': ['archer', 'health']
     }
     
-    left_stats, right_stats = {}, {}
+    # Scan row by row
+    for row in rows:
+        row_text = " ".join([b['text'] for b in row])
+        matched_key = None
+        
+        # Check if the row contains a stat label
+        for key, keywords in labels_map.items():
+            if all(kw in row_text for kw in keywords):
+                matched_key = key
+                break
+                
+        if matched_key:
+            # Look at all text blocks inside this row
+            for b in row:
+                # Extract clean numbers (ignoring +, %, and commas)
+                num_match = re.search(r'(\d+[\d\.]*)', b['text'].replace(',', ''))
+                if num_match:
+                    try:
+                        val = float(num_match.group(1))
+                        # Assign to Left or Right based on physical screen location
+                        if b['x'] < midpoint - 20: 
+                            left_stats[matched_key] = val
+                        elif b['x'] > midpoint + 20: 
+                            right_stats[matched_key] = val
+                    except: pass
+                    
+    return left_stats, right_stats
     
     for key, phrase in labels_map.items():
         # Hunts for numbers, allowing for commas and plus signs (e.g. "+ 1,050.5%")
@@ -249,39 +282,45 @@ else:
     st.sidebar.markdown("---")
     st.sidebar.markdown("### 📸 Dual-Column Battle Scanner")
     
+    # Added "None" option to ignore sides
     slot_options = ["None", "Garrison", "Wave 1", "Wave 2", "Wave 3", "Wave 4", "Wave 5"]
     
-    left_mapping = st.sidebar.selectbox("Assign LEFT Side To:", slot_options, index=2) # Default to Wave 1
-    right_mapping = st.sidebar.selectbox("Assign RIGHT Side To:", slot_options, index=1) # Default to Garrison
+    left_mapping = st.sidebar.selectbox("Assign LEFT Side To:", slot_options, index=2) # Default Wave 1
+    right_mapping = st.sidebar.selectbox("Assign RIGHT Side To:", slot_options, index=1) # Default Garrison
     
     ocr_upload = st.sidebar.file_uploader("Upload Screenshot", type=["png", "jpg", "jpeg"], key="dual_ocr_uploader")
     
     if ocr_upload is not None:
         if st.sidebar.button("Extract Data Columns", use_container_width=True, type="primary"):
-            with st.spinner("Splitting image layout matrices..."):
+            with st.spinner("Neural Engine mapping image rows..."):
                 left_stats_found, right_stats_found = scan_battle_report_side_by_side(ocr_upload)
                 
                 def inject_side_data(scanned_pool, assignment_label):
                     if assignment_label == "None" or not scanned_pool: return 0
                     
                     is_wave = assignment_label.startswith("Wave")
+                    # Force integer indexing to match your memory keys exactly
                     wave_idx = int(assignment_label.split(" ")[1]) - 1 if is_wave else 0
                     stat_mid = "" if is_wave else "g"
                     suffix = f"_{wave_idx}" if is_wave else ""
                     
+                    # UNIVERSAL SYNC: Apply the scan to all 3 tabs at the exact same time
+                    prefixes = ['s', 'o', 'r'] 
+                    
                     count = 0
                     for k, v in scanned_pool.items():
-                        target_key = f"{io_prefix}_{stat_mid}{k}{suffix}"
-                        st.session_state[target_key] = v
+                        for pref in prefixes:
+                            target_key = f"{pref}_{stat_mid}{k}{suffix}"
+                            st.session_state[target_key] = v
                         count += 1
                     return count
 
-                # Process injection loops
+                # Process injections
                 l_count = inject_side_data(left_stats_found, left_mapping)
                 r_count = inject_side_data(right_stats_found, right_mapping)
                 
                 if l_count > 0 or r_count > 0:
-                    st.sidebar.success(f"Mapped: {left_mapping} -> {l_count}/12 | {right_mapping} -> {r_count}/12")
+                    st.sidebar.success(f"Mapped: {left_mapping} -> {l_count} stats | {right_mapping} -> {r_count} stats")
                     st.rerun()
                 else:
                     st.sidebar.error("OCR ran, but failed to separate text nodes cleanly. Ensure you uploaded a stats page.")
