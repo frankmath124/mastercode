@@ -252,43 +252,47 @@ else:
                 
 # --- AUTO-SCAN BATTLE REPORT ---
     st.sidebar.markdown("---")
-    st.sidebar.markdown("### 📸 Dual-Column Battle Scanner")
+    st.sidebar.markdown("### 📸 Auto-Scan Battle Report")
     
-    # Define targets options
-    slot_options = ["Garrison", "Wave 1", "Wave 2", "Wave 3", "Wave 4", "Wave 5"]
+    # 1. Added "None" to the assignment options
+    slot_options = ["None", "Garrison", "Wave 1", "Wave 2", "Wave 3", "Wave 4", "Wave 5"]
     
-    left_mapping = st.sidebar.selectbox("Assign LEFT Side To:", slot_options, index=1) # Default to Wave 1
-    right_mapping = st.sidebar.selectbox("Assign RIGHT Side To:", slot_options, index=0) # Default to Garrison
+    left_mapping = st.sidebar.selectbox("Assign LEFT Side To:", slot_options, index=2) # Wave 1
+    right_mapping = st.sidebar.selectbox("Assign RIGHT Side To:", slot_options, index=1) # Garrison
     
     ocr_upload = st.sidebar.file_uploader("Upload Screenshot", type=["png", "jpg", "jpeg"], key="dual_ocr_uploader")
     
     if ocr_upload is not None:
-        if st.sidebar.button("Extract Data Columns", use_container_width=True, type="primary"):
-            with st.spinner("Splitting image layout matrices..."):
+        if st.sidebar.button(f"Extract & Apply", use_container_width=True, type="primary"):
+            with st.spinner("Neural Engine analyzing image..."):
                 left_stats_found, right_stats_found = scan_battle_report_side_by_side(ocr_upload)
                 
-                # Setup helper to inject stats cleanly into target state destinations
                 def inject_side_data(scanned_pool, assignment_label):
-                    is_wave = assignment_label != "Garrison"
+                    if assignment_label == "None" or not scanned_pool: return 0
+                    
+                    is_wave = assignment_label.startswith("Wave")
+                    # If it's a wave, index is 0-4. If it's Garrison, we use 'g'
+                    wave_idx = int(assignment_label.split(" ")[1]) - 1 if is_wave else 0
                     stat_mid = "" if is_wave else "g"
-                    suffix = f"_{int(assignment_label.split(' ')[1]) - 1}" if is_wave else ""
+                    suffix = f"_{wave_idx}" if is_wave else ""
                     
                     count = 0
                     for k, v in scanned_pool.items():
+                        # io_prefix is 's', 'o', or 'r' depending on your top selector
                         target_key = f"{io_prefix}_{stat_mid}{k}{suffix}"
                         st.session_state[target_key] = v
                         count += 1
                     return count
 
-                # Process injection loops
-                left_count = inject_side_data(left_stats_found, left_mapping)
-                right_count = inject_side_data(right_stats_found, right_mapping)
+                # Process injection
+                l_count = inject_side_data(left_stats_found, left_mapping)
+                r_count = inject_side_data(right_stats_found, right_mapping)
                 
-                if left_count > 0 or right_count > 0:
-                    st.sidebar.success(f"Mapped: {left_mapping} (Left) -> {left_count}/12 | {right_mapping} (Right) -> {right_count}/12")
+                if l_count > 0 or r_count > 0:
+                    st.sidebar.success(f"Mapped: {left_mapping} -> {l_count} | {right_mapping} -> {r_count}")
                     st.rerun()
                 else:
-                    st.sidebar.error("OCR ran, but failed to separate text nodes cleanly. Try a higher quality screenshot.")
+                    st.sidebar.warning("No data mapped. Check if 'None' was selected or if scan failed.")
 
     if st.sidebar.button("Lock Command Suite"):
         st.session_state["authenticated"] = False
