@@ -9,7 +9,6 @@ import gc  # <--- Added for explicit garbage collection flushing
 import threading # <--- Added to prevent parallel memory spikes
 from PIL import Image
 from simulator_engine import kingshot_multirally_sim2, TroopSide, load_hero_db
-
 # Establish a global threading lock for the OCR engine
 if "ocr_lock" not in st.session_state:
     st.session_state["ocr_lock"] = threading.Lock()
@@ -23,59 +22,79 @@ def load_ocr_reader():
     return easyocr.Reader(['en'], gpu=False)
 
 def scan_battle_report_side_by_side(image_file):
-    """Parses a side-by-side battle report safely using a thread lock to prevent crashes."""
+    """Parses a side-by-side battle report using Y-coordinate row grouping and a thread lock."""
     reader = load_ocr_reader()
     
     # Acquire the lock. If another user is scanning, this thread waits nicely in line
     with st.session_state["ocr_lock"]:
         image = Image.open(image_file)
         image_np = np.array(image)
-        img_width = image_np.shape[1]
-        midpoint = img_width / 2
+        midpoint = image_np.shape[1] / 2
         
+        # Detail=1 gives coordinates so we can map rows precisely
         results = reader.readtext(image_np, detail=1) 
         
-        left_strings = []
-        right_strings = []
-        
+        blocks = []
         for bbox, text, prob in results:
-            text_clean = text.lower().strip()
-            text_x_center = (bbox[0][0] + bbox[1][0]) / 2 
+            y_center = (bbox[0][1] + bbox[2][1]) / 2
+            x_center = (bbox[0][0] + bbox[1][0]) / 2
+            blocks.append({'text': text.lower().strip(), 'x': x_center, 'y': y_center})
             
-            if text_x_center < midpoint:
-                left_strings.append(text_clean)
-            else:
-                right_strings.append(text_clean)
-                
-        left_text_block = " ".join(left_strings)
-        right_text_block = " ".join(right_strings)
+        # Sort all text blocks top-to-bottom
+        blocks.sort(key=lambda b: b['y'])
         
-        labels_map = {
-            'ia': r'infantry\s*attack', 'id': r'infantry\s*defense', 'il': r'infantry\s*lethality', 'ih': r'infantry\s*health',
-            'ca': r'cavalry\s*attack',  'cd': r'cavalry\s*defense',  'cl': r'cavalry\s*lethality',  'ch': r'cavalry\s*health',
-            'aa': r'archer\s*attack',   'ad': r'archer\s*defense',   'al': r'archer\s*lethality',   'ah': r'archer\s*health'
-        }
-        
+        # Group text blocks into horizontal rows
+        rows = []
+        current_row = []
+        last_y = -100
+        for b in blocks:
+            if abs(b['y'] - last_y) > 20 and current_row:
+                rows.append(current_row)
+                current_row = []
+            current_row.append(b)
+            last_y = b['y']
+        if current_row: rows.append(current_row)
+            
         left_stats, right_stats = {}, {}
         
-        for key, phrase in labels_map.items():
-            pattern = phrase + r'.*?[\+\s]*([\d\.,]+)'
+        # Map for keyword hunting
+        labels_map = {
+            'ia': ['infantry', 'attack'], 'id': ['infantry', 'defense'], 'il': ['infantry', 'lethality'], 'ih': ['infantry', 'health'],
+            'ca': ['cavalry', 'attack'],  'cd': ['cavalry', 'defense'],  'cl': ['cavalry', 'lethality'],  'ch': ['cavalry', 'health'],
+            'aa': ['archer', 'attack'],   'ad': ['archer', 'defense'],   'al': ['archer', 'lethality'],   'ah': ['archer', 'health']
+        }
+        
+        # Scan row by row
+        for row in rows:
+            row_text = " ".join([b['text'] for b in row])
+            matched_key = None
             
-            l_match = re.search(pattern, left_text_block)
-            if l_match:
-                try: left_stats[key] = float(l_match.group(1).replace(',', ''))
-                except: pass
-                
-            r_match = re.search(pattern, right_text_block)
-            if r_match:
-                try: right_stats[key] = float(r_match.group(1).replace(',', ''))
-                except: pass
+            # Check if the row contains a stat label
+            for key, keywords in labels_map.items():
+                if all(kw in row_text for kw in keywords):
+                    matched_key = key
+                    break
+                    
+            if matched_key:
+                # Look at all text blocks inside this row
+                for b in row:
+                    # Extract clean numbers (ignoring +, %, and commas)
+                    num_match = re.search(r'(\d+[\d\.]*)', b['text'].replace(',', ''))
+                    if num_match:
+                        try:
+                            val = float(num_match.group(1))
+                            # Assign to Left or Right based on physical screen location
+                            if b['x'] < midpoint - 20: 
+                                left_stats[matched_key] = val
+                            elif b['x'] > midpoint + 20: 
+                                right_stats[matched_key] = val
+                        except: pass
         
         # Explicit Memory Cleanup right before releasing lock
         del image
         del image_np
         gc.collect() # Force free the RAM back to the host system
-        
+                        
     return left_stats, right_stats
     
     # Map for keyword hunting
@@ -352,7 +371,6 @@ else:
                     st.rerun()
                 else:
                     st.sidebar.error("OCR ran, but failed to separate text nodes cleanly. Ensure you uploaded a stats page.")
-
     if st.sidebar.button("Lock Command Suite"):
         st.session_state["authenticated"] = False
         st.rerun()
