@@ -16,43 +16,61 @@ def load_ocr_reader():
     """Initializes the EasyOCR reader once and caches it in memory."""
     return easyocr.Reader(['en'], gpu=False)
 
-def scan_battle_report(image_file):
-    """Scans an uploaded image and extracts Kingshot combat stats."""
+def scan_battle_report_side_by_side(image_file):
+    """Parses a side-by-side battle report screenshot into Left and Right stat pools."""
     reader = load_ocr_reader()
     
     image = Image.open(image_file)
     image_np = np.array(image)
+    img_width = image_np.shape[1]
+    midpoint = img_width / 2
     
-    raw_text_list = reader.readtext(image_np, detail=0) 
-    full_text = " ".join(raw_text_list).lower()
+    # Detail=1 gives us coordinates [[x_min, y_min], [x_max, y_max]] and the string text
+    results = reader.readtext(image_np, detail=1) 
     
-    extracted_stats = {}
+    # Dictionaries to hold our sorted string lines
+    left_strings = []
+    right_strings = []
     
-    # Regex patterns hunting for the specific stat decimals
-    patterns = {
-        'ia': r'infantry\s*attack.*?([\d\.]+)',
-        'id': r'infantry\s*defense.*?([\d\.]+)',
-        'il': r'infantry\s*lethality.*?([\d\.]+)',
-        'ih': r'infantry\s*health.*?([\d\.]+)',
-        'ca': r'cavalry\s*attack.*?([\d\.]+)',
-        'cd': r'cavalry\s*defense.*?([\d\.]+)',
-        'cl': r'cavalry\s*lethality.*?([\d\.]+)',
-        'ch': r'cavalry\s*health.*?([\d\.]+)',
-        'aa': r'archer\s*attack.*?([\d\.]+)',
-        'ad': r'archer\s*defense.*?([\d\.]+)',
-        'al': r'archer\s*lethality.*?([\d\.]+)',
-        'ah': r'archer\s*health.*?([\d\.]+)'
+    for bbox, text, prob in results:
+        text_clean = text.lower().strip()
+        # Find the center horizontal point of this text block
+        text_x_center = (bbox[0][0] + bbox[1][0]) / 2 
+        
+        # Sort based on screen layout
+        if text_x_center < midpoint:
+            left_strings.append(text_clean)
+        else:
+            right_strings.append(text_clean)
+            
+    left_text_block = " ".join(left_strings)
+    right_text_block = " ".join(right_strings)
+    
+    # Share the core stat dictionary labels
+    labels_map = {
+        'ia': 'infantry attack', 'id': 'infantry defense', 'il': 'infantry lethality', 'ih': 'infantry health',
+        'ca': 'cavalry attack', 'cd': 'cavalry defense', 'cl': 'cavalry lethality', 'ch': 'cavalry health',
+        'aa': 'archer attack',  'ad': 'archer defense',  'al': 'archer lethality',  'ah': 'archer health'
     }
     
-    for stat_key, regex_pattern in patterns.items():
-        match = re.search(regex_pattern, full_text)
-        if match:
-            try:
-                extracted_stats[stat_key] = float(match.group(1))
-            except ValueError:
-                pass
-                
-    return extracted_stats
+    left_stats = {}
+    right_stats = {}
+    
+    # Scan both sides independently
+    for key, phrase in labels_map.items():
+        # Look for numbers anywhere near or after the stat keyword names
+        # Match matches numbers with decimals or percentages like "+858.7%" or "1260.7%"
+        left_match = re.search(rf'{phrase}.*?([\d\.]+)', left_text_block)
+        if left_match:
+            try: left_stats[key] = float(left_match.group(1))
+            except: pass
+            
+        right_match = re.search(rf'{phrase}.*?([\d\.]+)', right_text_block)
+        if right_match:
+            try: right_stats[key] = float(right_match.group(1))
+            except: pass
+            
+    return left_stats, right_stats
 
 # =========================================================================
 # --- JSON FILE MANAGER ENGINE ---
@@ -232,34 +250,45 @@ else:
             else:
                 st.sidebar.error("Failed to parse the uploaded file.")
                 
+# --- AUTO-SCAN BATTLE REPORT ---
     st.sidebar.markdown("---")
-    st.sidebar.markdown("### 📸 Auto-Scan Battle Report")
+    st.sidebar.markdown("### 📸 Dual-Column Battle Scanner")
     
-    ocr_target = st.sidebar.selectbox("Scan Stats Into:", ["Garrison", "Wave 1", "Wave 2", "Wave 3", "Wave 4", "Wave 5"], key="ocr_target_select")
-    is_ocr_w = ocr_target != "Garrison"
-    ocr_w_idx = int(ocr_target.split(" ")[1]) - 1 if is_ocr_w else 0
+    # Define targets options
+    slot_options = ["Garrison", "Wave 1", "Wave 2", "Wave 3", "Wave 4", "Wave 5"]
     
-    ocr_upload = st.sidebar.file_uploader("Upload Screenshot", type=["png", "jpg", "jpeg"])
+    left_mapping = st.sidebar.selectbox("Assign LEFT Side To:", slot_options, index=1) # Default to Wave 1
+    right_mapping = st.sidebar.selectbox("Assign RIGHT Side To:", slot_options, index=0) # Default to Garrison
+    
+    ocr_upload = st.sidebar.file_uploader("Upload Screenshot", type=["png", "jpg", "jpeg"], key="dual_ocr_uploader")
     
     if ocr_upload is not None:
-        if st.sidebar.button(f"Extract & Apply to {ocr_target}", use_container_width=True):
-            with st.spinner("Neural Engine analyzing image..."):
-                scanned_data = scan_battle_report(ocr_upload)
+        if st.sidebar.button("Extract Data Columns", use_container_width=True, type="primary"):
+            with st.spinner("Splitting image layout matrices..."):
+                left_stats_found, right_stats_found = scan_battle_report_side_by_side(ocr_upload)
                 
-                if scanned_data:
-                    stat_mid = "" if is_ocr_w else "g"
-                    suffix = f"_{ocr_w_idx}" if is_ocr_w else ""
+                # Setup helper to inject stats cleanly into target state destinations
+                def inject_side_data(scanned_pool, assignment_label):
+                    is_wave = assignment_label != "Garrison"
+                    stat_mid = "" if is_wave else "g"
+                    suffix = f"_{int(assignment_label.split(' ')[1]) - 1}" if is_wave else ""
                     
-                    stats_found_count = 0
-                    for k, v in scanned_data.items():
+                    count = 0
+                    for k, v in scanned_pool.items():
                         target_key = f"{io_prefix}_{stat_mid}{k}{suffix}"
                         st.session_state[target_key] = v
-                        stats_found_count += 1
-                        
-                    st.sidebar.success(f"Successfully mapped {stats_found_count}/12 stats!")
+                        count += 1
+                    return count
+
+                # Process injection loops
+                left_count = inject_side_data(left_stats_found, left_mapping)
+                right_count = inject_side_data(right_stats_found, right_mapping)
+                
+                if left_count > 0 or right_count > 0:
+                    st.sidebar.success(f"Mapped: {left_mapping} (Left) -> {left_count}/12 | {right_mapping} (Right) -> {right_count}/12")
                     st.rerun()
                 else:
-                    st.sidebar.error("Could not detect recognizable stats in that image.")
+                    st.sidebar.error("OCR ran, but failed to separate text nodes cleanly. Try a higher quality screenshot.")
 
     if st.sidebar.button("Lock Command Suite"):
         st.session_state["authenticated"] = False
