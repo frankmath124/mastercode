@@ -873,7 +873,7 @@ else:
             else:
                 st.button("Run Optimization Engine Grid Search", disabled=True, key="o_run_disabled")
 
-    # =========================================================================
+   # =========================================================================
     # --- TAB 3: STAT ROI ENGINE ---
     # =========================================================================
     with tab_roi:
@@ -948,14 +948,17 @@ else:
                 r_gah = st.number_input("Arc HP %", value=1000.0, key="r_gah")
 
         with roi_main:
-            st.subheader("Testing Increment Scale (percent level increase stats)")
-            rc1, rc2 = st.columns(2)
-            nudge_val = rc1.number_input("Hypothetical Upgrade Increment Size (+ %)", min_value=5.0, max_value=200.0, value=25.0, step=5.0, key="r_nudge")
-            r_mc_runs = rc2.number_input("Monte Carlo Precision Iterations", min_value=10, max_value=500, value=50, step=10, key="r_mc_precision")
+            st.subheader("⚙️ Multi-Variable Strategy Allocation Budget")
+            
+            # Formats the inputs cleanly into three balanced columns
+            rc1, rc2, rc3 = st.columns(3)
+            total_pool = rc1.number_input("Total Stat Pool (+ %)", min_value=25.0, max_value=2000.0, value=200.0, step=25.0, key="r_total_pool")
+            step_size = rc2.number_input("Increment Step Size (+ %)", min_value=5.0, max_value=200.0, value=25.0, step=5.0, key="r_nudge")
+            r_mc_runs = rc3.number_input("Monte Carlo Precision", min_value=10, max_value=500, value=50, step=10, key="r_mc_precision")
             
             st.markdown("---")
             r_num_waves = st.number_input("Number of Incoming Mock Rallies to Absorb", min_value=1, max_value=5, value=2, step=1, key="r_waves_cnt")
-            r_wave_tabs = st.tabs([f" Wave {i+1}" for i in range(r_num_waves)])
+            r_wave_tabs = st.tabs([f"🌊 Wave {i+1}" for i in range(r_num_waves)])
             r_wave_configs = {}
             
             for i, tab in enumerate(r_wave_tabs):
@@ -1024,8 +1027,8 @@ else:
             r_all_waves_valid = all(st.session_state.get(f"r_wvalid_{w_idx}", True) for w_idx in range(r_num_waves))
             
             if r_all_waves_valid and r_g_valid:
-                if st.button(" Run Comprehensive Stat Optimization Analysis", key="r_run_btn"):
-                    with st.spinner("Calculating control baseline and spawning stat derivative testing loops..."):
+                if st.button("🚀 Run Multi-Variable Allocation Analysis", key="r_run_btn", type="primary"):
+                    with st.spinner("Calculating optimal multi-variable allocation path..."):
                         r_g_widgets = [r_g_wid1, r_g_wid2, r_g_wid3, 0, 0, 0, 0]
                         r_g_sups = [r_g_sup1, r_g_sup2, r_g_sup3, r_g_sup4]
                         
@@ -1034,11 +1037,8 @@ else:
                             rw_data = r_wave_configs[wave_idx]
                             rally_waves_input.append(TroopSide(rw_data["troops"], np.array(rw_data["stats"]), rw_data["leaders"], rw_data["supporters"], rw_data["tier"], rw_data["tg"], rw_data["widgets"]))
                         
-                        baseline_stats = [[r_gia, r_gid, r_gil, r_gih], [r_gca, r_gcd, r_gcl, r_gch], [r_gaa, r_gad, r_gal, r_gah]]
-                        control_garrison = TroopSide([r_g_inf, r_g_cav, r_g_arc], np.array(baseline_stats), [r_g_lead1, r_g_lead2, r_g_lead3], r_g_sups, r_g_tier, r_g_tg, r_g_widgets)
-                        
-                        control_surv_total = sum(np.sum(kingshot_multirally_sim2(copy.deepcopy(rally_waves_input), copy.deepcopy(control_garrison))[0].troops) for _ in range(r_mc_runs))
-                        control_avg = control_surv_total / r_mc_runs
+                        # Establish our active, shifting baseline profile
+                        active_stats = [[r_gia, r_gid, r_gil, r_gih], [r_gca, r_gcd, r_gcl, r_gch], [r_gaa, r_gad, r_gal, r_gah]]
                         
                         stat_map = [
                             ("Infantry Attack", 0, 0), ("Infantry Defense", 0, 1), ("Infantry Lethality", 0, 2), ("Infantry Health", 0, 3),
@@ -1046,25 +1046,52 @@ else:
                             ("Archer Attack", 2, 0),   ("Archer Defense", 2, 1),   ("Archer Lethality", 2, 2),   ("Archer Health", 2, 3)
                         ]
                         
-                        roi_leaderboard = []
-                        for label, row, col in stat_map:
-                            nudged_stats = copy.deepcopy(baseline_stats)
-                            nudged_stats[row][col] += nudge_val
-                            
-                            test_garrison = TroopSide([r_g_inf, r_g_cav, r_g_arc], np.array(nudged_stats), [r_g_lead1, r_g_lead2, r_g_lead3], r_g_sups, r_g_tier, r_g_tg, r_g_widgets)
-                            test_surv_total = sum(np.sum(kingshot_multirally_sim2(copy.deepcopy(rally_waves_input), copy.deepcopy(test_garrison))[0].troops) for _ in range(r_mc_runs))
-                            test_avg = test_surv_total / r_mc_runs
-                            
-                            saved_troops = test_avg - control_avg
-                            roi_leaderboard.append({"Metric Target": label, "Avg Saved Troops": max(0.0, saved_troops), "Casualty Reduction %": (max(0.0, saved_troops) / max(1, r_g_inf+r_g_cav+r_g_arc)) * 100})
-                            
-                        sorted_roi = sorted(roi_leaderboard, key=lambda x: x["Avg Saved Troops"], reverse=True)
-                        st.success("Optimization Analysis Grid Processing Completed!")
-                        st.subheader("Upgrade Efficiency Leaderboard")
+                        total_steps = int(total_pool // step_size)
+                        allocation_blueprint = {}
+                        summary_log = []
                         
-                        display_board = []
-                        for rank, entry in enumerate(sorted_roi):
-                            display_board.append({"Rank": rank + 1, "Stat Node Upgrade": f"Add +{nudge_val}% {entry['Metric Target']}", "Fewer Troops Dead (Avg)": f"{entry['Avg Saved Troops']:,.0f}", "Casualty Deflection Delta": f"+{entry['Casualty Reduction %']:.3f}%"})
-                        st.table(display_board)
+                        for current_step in range(1, total_steps + 1):
+                            # Calculate control survival for this specific step's baseline
+                            control_garrison = TroopSide([r_g_inf, r_g_cav, r_g_arc], np.array(active_stats), [r_g_lead1, r_g_lead2, r_g_lead3], r_g_sups, r_g_tier, r_g_tg, r_g_widgets)
+                            control_avg = sum(np.sum(kingshot_multirally_sim2(copy.deepcopy(rally_waves_input), copy.deepcopy(control_garrison))[0].troops) for _ in range(r_mc_runs)) / r_mc_runs
+                            
+                            step_leaderboard = []
+                            
+                            # Test adding our increment to every individual node
+                            for label, row, col in stat_map:
+                                nudged_stats = copy.deepcopy(active_stats)
+                                nudged_stats[row][col] += step_size
+                                
+                                test_garrison = TroopSide([r_g_inf, r_g_cav, r_g_arc], np.array(nudged_stats), [r_g_lead1, r_g_lead2, r_g_lead3], r_g_sups, r_g_tier, r_g_tg, r_g_widgets)
+                                test_avg = sum(np.sum(kingshot_multirally_sim2(copy.deepcopy(rally_waves_input), copy.deepcopy(test_garrison))[0].troops) for _ in range(r_mc_runs)) / r_mc_runs
+                                
+                                saved_troops = max(0.0, test_avg - control_avg)
+                                step_leaderboard.append({'label': label, 'row': row, 'col': col, 'saved': saved_troops})
+                            
+                            # Find the single best node for this specific step
+                            step_leaderboard.sort(key=lambda x: x['saved'], reverse=True)
+                            winner = step_leaderboard[0]
+                            
+                            # Lock the stats into our running active pool
+                            active_stats[winner['row']][winner['col']] += step_size
+                            allocation_blueprint[winner['label']] = allocation_blueprint.get(winner['label'], 0) + step_size
+                            
+                            summary_log.append({
+                                "Allocation Step": f"Step #{current_step} (+{step_size}%)",
+                                "Target Stat Selected": winner['label'],
+                                "Additional Saved Troops": f"{winner['saved']:,.0f}",
+                                "Running Profile State": f"Total Assigned: {allocation_blueprint[winner['label']]}%"
+                            })
+                            
+                        st.success("🎯 Multi-Variable Upgrade Blueprint Calculated!")
+                        
+                        # Output 1: Clear Summary Matrix Table
+                        st.subheader("📋 Step-by-Step Investment Roadmap")
+                        st.table(summary_log)
+                        
+                        # Output 2: Final Tally Summary
+                        st.subheader("📊 Final Recommended Stat Distribution")
+                        final_tally = [{"Stat Node": k, "Total Investment Recommended": f"+{v}%"} for k, v in allocation_blueprint.items()]
+                        st.table(final_tally)
             else:
-                st.button("Run Comprehensive Stat ROI Analysis", disabled=True, key="r_run_disabled")
+                st.button("🚀 Run Multi-Variable Allocation Analysis", disabled=True, key="r_run_disabled")
