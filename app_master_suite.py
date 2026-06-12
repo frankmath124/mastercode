@@ -394,7 +394,7 @@ else:
     tab_sim, tab_opt, tab_roi = st.tabs([
         "Multi-Rally Simulator", 
         "Battle Optimizer", 
-        "Stat Improvement Optimizer"
+        "Stat Improvement Optimizer",
         "Gear and Charm Optimizer"
     ])
 
