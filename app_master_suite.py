@@ -391,12 +391,13 @@ else:
             st.markdown("### Stat Optimizer Engine")
             st.write("Isolate variables by injecting small stat changes. Calculates exactly how many fewer troop deaths an upgrade prevents to provide upgrade guidance.")
 
-    tab_sim, tab_opt, tab_roi = st.tabs([
-        "Multi-Rally Simulator", 
-        "Battle Optimizer", 
-        "Stat Improvement Optimizer",
-        "Gear and Charm Optimizer"
-    ])
+# Replace your old tab layout row with this four-tab tuple:
+tab_sim, tab_opt, tab_roi, tab_gear = st.tabs([
+    "Multi-Rally Simulator", 
+    "Battle Optimizer", 
+    "Stat Improvement Optimizer", 
+    "Gear & Charm Optimizer"
+])
 
 # =========================================================================
 # GLOBAL GEAR OPTIMIZER DATABASE UTILITIES
