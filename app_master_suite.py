@@ -97,57 +97,10 @@ def scan_battle_report_side_by_side(image_file):
         gc.collect() # Force free the RAM back to the host system
                         
     return left_stats, right_stats
-    
-    # Map for keyword hunting
-    labels_map = {
-        'ia': ['infantry', 'attack'], 'id': ['infantry', 'defense'], 'il': ['infantry', 'lethality'], 'ih': ['infantry', 'health'],
-        'ca': ['cavalry', 'attack'],  'cd': ['cavalry', 'defense'],  'cl': ['cavalry', 'lethality'],  'ch': ['cavalry', 'health'],
-        'aa': ['archer', 'attack'],   'ad': ['archer', 'defense'],   'al': ['archer', 'lethality'],   'ah': ['archer', 'health']
-    }
-    
-    # Scan row by row
-    for row in rows:
-        row_text = " ".join([b['text'] for b in row])
-        matched_key = None
-        
-        # Check if the row contains a stat label
-        for key, keywords in labels_map.items():
-            if all(kw in row_text for kw in keywords):
-                matched_key = key
-                break
-                
-        if matched_key:
-            # Look at all text blocks inside this row
-            for b in row:
-                # Extract clean numbers (ignoring +, %, and commas)
-                num_match = re.search(r'(\d+[\d\.]*)', b['text'].replace(',', ''))
-                if num_match:
-                    try:
-                        val = float(num_match.group(1))
-                        # Assign to Left or Right based on physical screen location
-                        if b['x'] < midpoint - 20: 
-                            left_stats[matched_key] = val
-                        elif b['x'] > midpoint + 20: 
-                            right_stats[matched_key] = val
-                    except: pass
-                    
-    return left_stats, right_stats
-    
-    for key, phrase in labels_map.items():
-        # Hunts for numbers, allowing for commas and plus signs (e.g. "+ 1,050.5%")
-        pattern = phrase + r'.*?[\+\s]*([\d\.,]+)'
-        
-        l_match = re.search(pattern, left_text_block)
-        if l_match:
-            try: left_stats[key] = float(l_match.group(1).replace(',', ''))
-            except: pass
-            
-        r_match = re.search(pattern, right_text_block)
-        if r_match:
-            try: right_stats[key] = float(r_match.group(1).replace(',', ''))
-            except: pass
-            
-    return left_stats, right_stats
+
+# =========================================================================
+# --- JSON FILE MANAGER ENGINE ---
+# =========================================================================
 # =========================================================================
 # --- JSON FILE MANAGER ENGINE ---
 # =========================================================================
