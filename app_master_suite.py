@@ -391,7 +391,8 @@ def calculate_hero_gear_xp_cost(current_level):
     # =========================================================================
     # --- TAB 1: MULTI-RALLY SIMULATOR ---
     # =========================================================================
-    with tab_sim:
+    # 
+with tab_sim:
         st.header("Sequential Multi-Rally Wave Simulation")
         
         c1, c2, _ = st.columns([1, 1, 2])
