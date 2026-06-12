@@ -388,10 +388,11 @@ def calculate_hero_gear_xp_cost(current_level):
     if current_level >= 200: return 9999999
     return int(10 + (current_level * 5) + ((current_level ** 1.5) * 0.25))
 
-    # =========================================================================
-    # --- TAB 1: MULTI-RALLY SIMULATOR ---
-    # =========================================================================
-    # 
+# =========================================================================
+# --- TAB 1: MULTI-RALLY SIMULATOR ---
+#     # =========================================================================
+# 
+
 with tab_sim:
         st.header("Sequential Multi-Rally Wave Simulation")
         
@@ -593,7 +594,8 @@ with tab_sim:
     # =========================================================================
     # --- TAB 2: TACTICAL OPTIMIZER ---
     # =========================================================================
-    with tab_opt:
+
+with tab_opt:
         st.header("Multi-Rally Optimization Engine")
         
         c1, c2, _ = st.columns([1, 1, 2])
@@ -869,7 +871,7 @@ with tab_sim:
    # =========================================================================
     # --- TAB 3: STAT ROI ENGINE ---
     # =========================================================================
-    with tab_roi:
+with tab_roi:
         st.header("Multi-Variable Stat Optimizer")
         
         c1, c2, _ = st.columns([1, 1, 2])
@@ -1091,7 +1093,7 @@ with tab_sim:
                 # =========================================================================
     # --- TAB 4: COMPREHENSIVE ASSET & GEAR OPTIMIZER WITH MONOTONICITY GUARD ---
     # =========================================================================
-    with tab_gear:
+with tab_gear:
         st.header("🎯 Greedy Account Progression & Gear Optimizer")
         st.caption("Calculates the highest combat ROI across Charms, Governor Gear, and Hero Gear using true multi-budget simulation passes.")
 
