@@ -1094,7 +1094,7 @@ with tab_roi:
     # =========================================================================
     # --- TAB 4: SURGICAL HERO GEAR OPTIMIZER ---
     # =========================================================================
-    with tab_gear:
+with tab_gear:
         st.header("🎯 Surgical Hero Gear Optimizer")
         st.caption("A granular, slot-specific optimizer that calculates exact combat ROI for Helm, Glove, Chest, and Boot upgrades.")
 
