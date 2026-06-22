@@ -1090,17 +1090,17 @@ with tab_roi:
                         st.table(final_tally)
             else:
                 st.button("🚀 Run Multi-Variable Allocation Analysis", disabled=True, key="r_run_disabled")
-                # =========================================================================
-    # --- TAB 4: COMPREHENSIVE ASSET & GEAR OPTIMIZER WITH MONOTONICITY GUARD ---
+               # =========================================================================
+    # --- TAB 4: SURGICAL HERO GEAR OPTIMIZER ---
     # =========================================================================
 with tab_gear:
-        st.header("🎯 Greedy Account Progression & Gear Optimizer")
-        st.caption("Calculates the highest combat ROI across Charms, Governor Gear, and Hero Gear using true multi-budget simulation passes.")
+        st.header("🎯 Surgical Hero Gear Optimizer")
+        st.caption("A granular, slot-specific optimizer that calculates exact combat ROI for Helm, Glove, Chest, and Boot upgrades.")
 
         # Establish global mapping databases for the execution run
         atlases = load_stat_atlases()
         
-        # Ascension milestone requirements table parsed from gear.xlsx: [Required Mastery, Required Mithril, Required Mythic Pieces]
+        # Ascension milestone requirements table: [Required Mastery, Required Mithril, Required Mythic Pieces]
         ascension_table = {
             100: [10, 0, 2],   # Mythic -> Red baseline transition
             120: [11, 10, 3],  # 100 -> 120 bracket step
@@ -1109,21 +1109,79 @@ with tab_gear:
             180: [14, 40, 10]  # 160 -> 180 bracket step
         }
 
+        def run_isolated_simulation(profile_state):
+                        """Dynamically maps active gear choices onto combat arrays to measure custom troop retention values."""
+                        # Establish standard base configurations
+                        my_stats_matrix = np.array([
+                            [my_base_atk, my_base_def, my_base_atk - 100.0, my_base_def + 100.0],  # Infantry [Atk, Def, Let, HP]
+                            [my_base_atk - 50.0, my_base_def - 50.0, my_base_atk - 150.0, my_base_def - 50.0],  # Cavalry
+                            [my_base_atk + 100.0, my_base_def - 100.0, my_base_atk, my_base_def - 100.0]   # Archer
+                        ])
+                        
+                        opp_stats_matrix = np.array([
+                            [opp_base_atk, opp_base_def, opp_base_atk - 100.0, opp_base_def + 100.0],
+                            [opp_base_atk - 50.0, opp_base_def - 50.0, opp_base_atk - 150.0, opp_base_def - 50.0],
+                            [opp_base_atk + 100.0, opp_base_def - 100.0, opp_base_atk, opp_base_def - 100.0]
+                        ])
+                        
+                        # Apply gear stat deltas to the correct side based on role choice
+                        troop_keys = ["infantry", "cavalry", "archer"]
+                        
+                        target_matrix = my_stats_matrix if opt_role == "Rally Attacker" else opp_stats_matrix
+                        active_profile = profile_state if opt_role == "Rally Attacker" else current_profile # Keep control stable if defending
+                        
+                        # Compute deltas directly into the designated matrix array
+                        for r, troop in enumerate(troop_keys):
+                            # 1. Helms & Boots handle Lethality (Index 2)
+                            h_boost = get_hero_gear_stat(active_profile[troop]["Helm"]["tier"], active_profile[troop]["Helm"]["lvl"]) * 100.0
+                            h_final = h_boost * (1.0 + (active_profile[troop]["Helm"]["mastery"] * 0.10))
+                            
+                            b_boost = get_hero_gear_stat(active_profile[troop]["Boots"]["tier"], active_profile[troop]["Boots"]["lvl"]) * 100.0
+                            b_final = b_boost * (1.0 + (active_profile[troop]["Boots"]["mastery"] * 0.10))
+                            
+                            target_matrix[r, 2] += (h_final + b_final)
+                            
+                            # 2. Gloves & Chests handle Health (Index 3)
+                            g_boost = get_hero_gear_stat(active_profile[troop]["Gloves"]["tier"], active_profile[troop]["Gloves"]["lvl"]) * 100.0
+                            g_final = g_boost * (1.0 + (active_profile[troop]["Gloves"]["mastery"] * 0.10))
+                            
+                            c_boost = get_hero_gear_stat(active_profile[troop]["Chest"]["tier"], active_profile[troop]["Chest"]["lvl"]) * 100.0
+                            c_final = c_boost * (1.0 + (active_profile[troop]["Chest"]["mastery"] * 0.10))
+                            
+                            target_matrix[r, 3] += (g_final + c_final)
+
+                        # Assemble dynamic TroopSide elements
+                        my_march = TroopSide([my_inf, my_cav, my_arc], my_stats_matrix, [my_h1, my_h2, my_h3], ["None"]*4)
+                        opp_march = TroopSide([opp_inf, opp_cav, opp_arc], opp_stats_matrix, [opp_h1, opp_h2, opp_h3], ["None"]*4)
+                        
+                        # Assign Attacker vs Defender labels to process widget logic boundaries correctly
+                        attacker_side = my_march if opt_role == "Rally Attacker" else opp_march
+                        defender_side = opp_march if opt_role == "Rally Attacker" else my_march
+                        
+                        total_surviving_target = 0
+                        for _ in range(mc_precision):
+                            res = kingshot_multirally_sim2([copy.deepcopy(attacker_side)], copy.deepcopy(defender_side))
+                            # Track surviving counts based on what role you are optimizing for
+                            if opt_role == "Rally Attacker":
+                                total_surviving_target += np.sum(res[1][0]['attacker_surviving'])
+                            else:
+                                total_surviving_target += np.sum(res[0].troops)
+                                
+                        return total_surviving_target / mc_precision
+
         g_main, g_side = st.columns([2, 1])
 
         with g_side:
             st.markdown("### 🎒 Your Asset Inventory")
             
-            # Hero Gear XP Parsing (image_d96ccc.png framework)
             with st.expander("✨ Hero Gear XP Quantities", expanded=True):
-                green_books = st.number_input("10 Enhancement XP Part (Green)", min_value=0, value=50, step=10, key="g_xp_green")
-                purple_books = st.number_input("100 Enhancement XP Part (Purple)", min_value=0, value=15, step=5, key="g_xp_purple")
-                com_gear = st.number_input("Common Gear Material (10 XP)", min_value=0, value=20, key="g_xp_com")
-                uncom_gear = st.number_input("Uncommon Gear Material (30 XP)", min_value=0, value=10, key="g_xp_uncom")
-                rare_gear = st.number_input("Rare Gear Material (60 XP)", min_value=0, value=5, key="g_xp_rare")
-                epic_gear = st.number_input("Epic Gear Material (150 XP)", min_value=0, value=2, key="g_xp_epic")
+                green_books = st.number_input("10 XP Part (Green)", min_value=0, value=50, step=10, key="g_xp_green")
+                purple_books = st.number_input("100 XP Part (Purple)", min_value=0, value=15, step=5, key="g_xp_purple")
+                com_gear = st.number_input("Common Gear (10 XP)", min_value=0, value=20, key="g_xp_com")
+                uncom_gear = st.number_input("Uncommon Gear (30 XP)", min_value=0, value=10, key="g_xp_uncom")
+                rare_gear = st.number_input("Rare Gear (60 XP)", min_value=0, value=5, key="g_xp_rare")
+                epic_gear = st.number_input("Epic Gear (150 XP)", min_value=0, value=2, key="g_xp_epic")
                 
-                # Calculate aggregated baseline bag pools
                 calculated_xp_pool = (green_books * 10) + (purple_books * 100) + (com_gear * 10) + (uncom_gear * 30) + (rare_gear * 60) + (epic_gear * 150)
                 st.info(f"**Total Available XP Reservoir:** {calculated_xp_pool:,.0f} XP")
                 
@@ -1131,13 +1189,6 @@ with tab_gear:
                 inv_hammers = st.number_input("Available Forgehammers", min_value=0, value=350, key="g_inv_hammers")
                 inv_mithril = st.number_input("Available Mithril", min_value=0, value=15, key="g_inv_mithril")
                 inv_mythic_pieces = st.number_input("Available Mythic Gear Duplicates", min_value=0, value=4, key="g_inv_pieces")
-                
-            with st.expander("📜 Charm & Governor Materials", expanded=True):
-                inv_guides = st.number_input("Available Charm Guides", min_value=0, value=500, key="g_inv_guides")
-                inv_designs = st.number_input("Available Charm Designs", min_value=0, value=400, key="g_inv_designs")
-                inv_satin = st.number_input("Available Satin Sheets", min_value=0, value=25000, key="g_inv_satin")
-                inv_threads = st.number_input("Available Thread Spools", min_value=0, value=500, key="g_inv_threads")
-                inv_artisans = st.number_input("Available Artisan Tokens", min_value=0, value=120, key="g_inv_artisans")
 
             with st.expander("🛡️ Target Defense Environment (Rival Wall)"):
                 env_inf = st.number_input("Threat Target Infantry Array Count", value=1200000, key="g_env_inf")
@@ -1150,54 +1201,62 @@ with tab_gear:
             mc_precision = t_c1.slider("Greedy Search Pass Precision (Monte Carlo)", 10, 150, 40, step=10, key="g_precision_slider")
             monotonicity_guard = t_c2.toggle("Engage Monotonicity Guard", value=True, key="g_mono_toggle")
             
-            st.markdown("#### Current Account Level States")
+            st.markdown("#### Granular Hero Gear States")
             st_c1, st_c2, st_c3 = st.columns(3)
             
+            def create_gear_slot_ui(troop, slot, default_tier, default_lvl, default_mast):
+                """Helper function to cleanly generate UI for specific gear slots."""
+                st.markdown(f"**{troop} {slot}**")
+                tier = st.selectbox("Tier", ["Epic", "Mythic", "Red"], index=["Epic", "Mythic", "Red"].index(default_tier), key=f"g_{troop.lower()}_{slot.lower()}_t")
+                lvl = st.number_input("Enhance Lvl", 0, 200, default_lvl, key=f"g_{troop.lower()}_{slot.lower()}_l")
+                mast = st.number_input("Mastery Lvl", 0, 20, default_mast, key=f"g_{troop.lower()}_{slot.lower()}_m")
+                return {"tier": tier, "lvl": lvl, "mastery": mast}
+
             # Row 1: Infantry Asset Matrix Input
             with st_c1:
-                st.markdown("**Infantry Upgrades**")
-                inf_charm_lvl = st.number_input("Charm Level", 0, 10, 6, key="cur_inf_ch")
-                inf_gov_lvl = st.number_input("Gov Tier Index", 0, 8, 3, key="cur_inf_gov") 
-                inf_hero_tier = st.selectbox("Hero Quality", ["Epic", "Mythic", "Red"], index=1, key="cur_inf_hq")
-                inf_hero_lvl = st.number_input("Hero Level", 0, 200, 45, key="cur_inf_hl")
-                inf_hero_mastery = st.number_input("Mastery Star Lvl", 0, 20, 4, key="cur_inf_hm")
+                inf_helm = create_gear_slot_ui("Infantry", "Helm", "Mythic", 83, 4)
+                st.markdown("---")
+                inf_gloves = create_gear_slot_ui("Infantry", "Gloves", "Red", 120, 11)
+                st.markdown("---")
+                inf_chest = create_gear_slot_ui("Infantry", "Chest", "Mythic", 100, 7)
+                st.markdown("---")
+                inf_boots = create_gear_slot_ui("Infantry", "Boots", "Mythic", 85, 5)
             
             # Row 2: Cavalry Asset Matrix Input
             with st_c2:
-                st.markdown("**Cavalry Upgrades**")
-                cav_charm_lvl = st.number_input("Charm Level", 0, 10, 5, key="cur_cav_ch")
-                cav_gov_lvl = st.number_input("Gov Tier Index", 0, 8, 2, key="cur_cav_gov")
-                cav_hero_tier = st.selectbox("Hero Quality", ["Epic", "Mythic", "Red"], index=1, key="cur_cav_hq")
-                cav_hero_lvl = st.number_input("Hero Level", 0, 200, 40, key="cur_cav_hl")
-                cav_hero_mastery = st.number_input("Mastery Star Lvl", 0, 20, 3, key="cur_cav_hm")
+                cav_helm = create_gear_slot_ui("Cavalry", "Helm", "Mythic", 87, 5)
+                st.markdown("---")
+                cav_gloves = create_gear_slot_ui("Cavalry", "Gloves", "Mythic", 48, 1)
+                st.markdown("---")
+                cav_chest = create_gear_slot_ui("Cavalry", "Chest", "Mythic", 48, 1)
+                st.markdown("---")
+                cav_boots = create_gear_slot_ui("Cavalry", "Boots", "Mythic", 87, 5)
             
             # Row 3: Archer Asset Matrix Input
             with st_c3:
-                st.markdown("**Archer Upgrades**")
-                arc_charm_lvl = st.number_input("Charm Level", 0, 10, 5, key="cur_arc_ch")
-                arc_gov_lvl = st.number_input("Gov Tier Index", 0, 8, 2, key="cur_arc_gov")
-                arc_hero_tier = st.selectbox("Hero Quality", ["Epic", "Mythic", "Red"], index=1, key="cur_arc_hq")
-                arc_hero_lvl = st.number_input("Hero Level", 0, 200, 40, key="cur_arc_hl")
-                arc_hero_mastery = st.number_input("Mastery Star Lvl", 0, 20, 3, key="cur_arc_hm")
+                arc_helm = create_gear_slot_ui("Archer", "Helm", "Mythic", 84, 5)
+                st.markdown("---")
+                arc_gloves = create_gear_slot_ui("Archer", "Gloves", "Mythic", 61, 2)
+                st.markdown("---")
+                arc_chest = create_gear_slot_ui("Archer", "Chest", "Mythic", 61, 2)
+                st.markdown("---")
+                arc_boots = create_gear_slot_ui("Archer", "Boots", "Mythic", 87, 5)
 
             st.markdown("---")
             
-            if st.button("🚀 Execute Comprehensive Greedy Optimization Pass", type="primary", use_container_width=True, key="g_run_pass_btn"):
-                with st.spinner("Processing local optimum strategy chains via Multi-Budget Matrix..."):
+            if st.button("🚀 Execute Granular Hero Gear Optimization Pass", type="primary", use_container_width=True, key="g_run_pass_btn"):
+                with st.spinner("Processing granular optimum strategy chains via Multi-Budget Matrix..."):
                     
                     # Format baseline control configurations
                     current_profile = {
-                        "charms": [inf_charm_lvl, cav_charm_lvl, arc_charm_lvl],
-                        "gov": [inf_gov_lvl, cav_gov_lvl, arc_gov_lvl],
-                        "hero_tier": [inf_hero_tier, cav_hero_tier, arc_hero_tier],
-                        "hero_lvl": [inf_hero_lvl, cav_hero_lvl, arc_hero_lvl],
-                        "hero_mastery": [inf_hero_mastery, cav_hero_mastery, arc_hero_mastery]
+                        "infantry": {"Helm": inf_helm, "Gloves": inf_gloves, "Chest": inf_chest, "Boots": inf_boots},
+                        "cavalry": {"Helm": cav_helm, "Gloves": cav_gloves, "Chest": cav_chest, "Boots": cav_boots},
+                        "archer": {"Helm": arc_helm, "Gloves": arc_gloves, "Chest": arc_chest, "Boots": arc_boots}
                     }
                     
                     wallet = {
                         "XP": calculated_xp_pool, "Forgehammer": inv_hammers, "Mithril": inv_mithril,
-                        "Mythic Piece": inv_mythic_pieces, "Charm Guide": inv_guides, "Charm Design": inv_designs,
-                        "Satin": inv_satin, "Thread": inv_threads, "Artisan": inv_artisans
+                        "Mythic Piece": inv_mythic_pieces
                     }
                     
                     def run_isolated_simulation(profile_state):
@@ -1208,34 +1267,26 @@ with tab_gear:
                             [1450.0, 1050.0, 1350.0, 1150.0]   # Archer
                         ])
                         
-                        for r in range(3):
-                            # Apply Charms
-                            c_lvl = profile_state["charms"][r]
-                            charm_boost = sum(atlases["charms"]["deltas"][:c_lvl+1]) * 100.0
-                            sim_stats[r, 2] += charm_boost  
-                            sim_stats[r, 3] += charm_boost  
+                        troop_keys = ["infantry", "cavalry", "archer"]
+                        for r, troop in enumerate(troop_keys):
                             
-                            # Apply Governor Gear
-                            g_lvl = profile_state["gov"][r]
-                            gov_boost = sum(atlases["gov"]["deltas"][:g_lvl+1]) * 100.0
-                            sim_stats[r, 0] += gov_boost  
-                            sim_stats[r, 1] += gov_boost  
+                            # 1. Helms & Boots apply strictly to Lethality (Index 2)
+                            helm_boost = get_hero_gear_stat(profile_state[troop]["Helm"]["tier"], profile_state[troop]["Helm"]["lvl"]) * 100.0
+                            helm_final = helm_boost * (1.0 + (profile_state[troop]["Helm"]["mastery"] * 0.10))
                             
-                            # Apply Base Hero Gear Stats from sheet formulas
-                            h_tier = profile_state["hero_tier"][r]
-                            h_lvl = profile_state["hero_lvl"][r]
-                            hero_boost = get_hero_gear_stat(h_tier, h_lvl) * 100.0
+                            boots_boost = get_hero_gear_stat(profile_state[troop]["Boots"]["tier"], profile_state[troop]["Boots"]["lvl"]) * 100.0
+                            boots_final = boots_boost * (1.0 + (profile_state[troop]["Boots"]["mastery"] * 0.10))
                             
-                            # Factor in Mastery Forge Multipliers (+10% base value scaling per star level)
-                            m_lvl = profile_state["hero_mastery"][r]
-                            mastery_multiplier = 1.0 + (m_lvl * 0.10)
-                            final_hero_boost = hero_boost * mastery_multiplier
+                            sim_stats[r, 2] += (helm_final + boots_final)
                             
-                            # Inject vectors smoothly into army profile parameters
-                            sim_stats[r, 0] += final_hero_boost  
-                            sim_stats[r, 2] += final_hero_boost
-                            sim_stats[r, 1] += final_hero_boost  
-                            sim_stats[r, 3] += final_hero_boost
+                            # 2. Gloves & Chests apply strictly to Health (Index 3)
+                            gloves_boost = get_hero_gear_stat(profile_state[troop]["Gloves"]["tier"], profile_state[troop]["Gloves"]["lvl"]) * 100.0
+                            gloves_final = gloves_boost * (1.0 + (profile_state[troop]["Gloves"]["mastery"] * 0.10))
+                            
+                            chest_boost = get_hero_gear_stat(profile_state[troop]["Chest"]["tier"], profile_state[troop]["Chest"]["lvl"]) * 100.0
+                            chest_final = chest_boost * (1.0 + (profile_state[troop]["Chest"]["mastery"] * 0.10))
+                            
+                            sim_stats[r, 3] += (gloves_final + chest_final)
 
                         attacker = TroopSide([500000, 200000, 300000], sim_stats, ["Amadeus", "Hilde", "Marlin"], ["Chenko", "Gordon", "None", "None"])
                         defender = TroopSide([env_inf, 400000, 400000], np.array([[env_stats]*4]*3), ["Amadeus", "Hilde", "Marlin"], ["Chenko", "None", "None", "None"])
@@ -1262,95 +1313,62 @@ with tab_gear:
                             control_surv = run_isolated_simulation(loop_state_profile)
                             candidates = []
                             
-                            # --- SCAN OPTION A: CHARMS ---
-                            for troop_idx, label in enumerate(["Infantry", "Cavalry", "Archer"]):
-                                current_lvl = loop_state_profile["charms"][troop_idx]
-                                if current_lvl < 10:
-                                    req_guides = atlases["charms"]["guides"][current_lvl + 1]
-                                    req_designs = atlases["charms"]["designs"][current_lvl + 1]
-                                    if loop_wallet["Charm Guide"] >= req_guides and loop_wallet["Charm Design"] >= req_designs:
-                                        test_profile = copy.deepcopy(loop_state_profile)
-                                        test_profile["charms"][troop_idx] += 1
-                                        test_surv = run_isolated_simulation(test_profile)
-                                        saved = max(0.001, test_surv - control_surv)
-                                        eff = saved / max(1, req_guides + req_designs)
-                                        candidates.append({
-                                            "type": "charms", "idx": troop_idx, "label": f"Level up {label} Charms to Lvl {current_lvl + 1}",
-                                            "cost": {"Charm Guide": req_guides, "Charm Design": req_designs}, "efficiency": eff, "saved": saved
-                                        })
-
-                            # --- SCAN OPTION B: GOVERNOR GEAR ---
-                            for troop_idx, label in enumerate(["Infantry", "Cavalry", "Archer"]):
-                                current_lvl = loop_state_profile["gov"][troop_idx]
-                                if current_lvl < 8:
-                                    req_satin = atlases["gov"]["satin"][current_lvl + 1]
-                                    req_thread = atlases["gov"]["threads"][current_lvl + 1]
-                                    req_artisan = atlases["gov"]["artisans"][current_lvl + 1]
-                                    if (loop_wallet["Satin"] >= req_satin and loop_wallet["Thread"] >= req_thread and loop_wallet["Artisan"] >= req_artisan):
-                                        test_profile = copy.deepcopy(loop_state_profile)
-                                        test_profile["gov"][troop_idx] += 1
-                                        test_surv = run_isolated_simulation(test_profile)
-                                        saved = max(0.001, test_surv - control_surv)
-                                        eff = saved / max(1, req_satin * 0.01 + req_thread + req_artisan * 10)
-                                        candidates.append({
-                                            "type": "gov", "idx": troop_idx, "label": f"Upgrade {label} Gov Gear to {atlases['gov']['names'][current_lvl + 1]}",
-                                            "cost": {"Satin": req_satin, "Thread": req_thread, "Artisan": req_artisan}, "efficiency": eff, "saved": saved
-                                        })
-
-                            # --- SCAN OPTION C: HERO GEAR ENHANCEMENTS AND BRACKET GATES ---
-                            for troop_idx, label in enumerate(["Infantry", "Cavalry", "Archer"]):
-                                current_lvl = loop_state_profile["hero_lvl"][troop_idx]
-                                current_tier = loop_state_profile["hero_tier"][troop_idx]
-                                current_mastery = loop_state_profile["hero_mastery"][troop_idx]
-                                
-                                if current_lvl in ascension_table:
-                                    # Target piece hits a gated threshold boundary line
-                                    req_mastery, req_mithril, req_mythic_pieces = ascension_table[current_lvl]
-                                    if current_mastery >= req_mastery:
-                                        if loop_wallet["Mithril"] >= req_mithril and loop_wallet["Mythic Piece"] >= req_mythic_pieces:
+                            # --- SCAN HERO GEAR ENHANCEMENTS AND BRACKET GATES ---
+                            for troop in ["infantry", "cavalry", "archer"]:
+                                for slot in ["Helm", "Gloves", "Chest", "Boots"]:
+                                    current_lvl = loop_state_profile[troop][slot]["lvl"]
+                                    current_tier = loop_state_profile[troop][slot]["tier"]
+                                    current_mastery = loop_state_profile[troop][slot]["mastery"]
+                                    
+                                    if current_lvl in ascension_table:
+                                        # Target piece hits a gated threshold boundary line
+                                        req_mastery, req_mithril, req_mythic_pieces = ascension_table[current_lvl]
+                                        if current_mastery >= req_mastery:
+                                            if loop_wallet["Mithril"] >= req_mithril and loop_wallet["Mythic Piece"] >= req_mythic_pieces:
+                                                test_profile = copy.deepcopy(loop_state_profile)
+                                                test_profile[troop][slot]["lvl"] += 1
+                                                if current_lvl == 100 and current_tier == "Mythic":
+                                                    test_profile[troop][slot]["tier"] = "Red"
+                                                    
+                                                test_surv = run_isolated_simulation(test_profile)
+                                                saved = max(0.001, test_surv - control_surv)
+                                                eff = saved / max(1, (req_mithril * 50) + (req_mythic_pieces * 500))
+                                                candidates.append({
+                                                    "type": "hero_ascend", "troop": troop, "slot": slot, "label": f"🔺 Ascend {troop.capitalize()} {slot} past Lvl {current_lvl} gate",
+                                                    "cost": {"Mithril": req_mithril, "Mythic Piece": req_mythic_pieces}, "efficiency": eff, "saved": saved
+                                                })
+                                    else:
+                                        # Regular incremental level processing loop
+                                        req_xp = calculate_hero_gear_xp_cost(current_lvl)
+                                        if loop_wallet["XP"] >= req_xp and current_lvl < 200:
                                             test_profile = copy.deepcopy(loop_state_profile)
-                                            test_profile["hero_lvl"][troop_idx] += 1
-                                            if current_lvl == 100 and current_tier == "Mythic":
-                                                test_profile["hero_tier"][troop_idx] = "Red"
-                                                
+                                            test_profile[troop][slot]["lvl"] += 1
                                             test_surv = run_isolated_simulation(test_profile)
                                             saved = max(0.001, test_surv - control_surv)
-                                            eff = saved / max(1, (req_mithril * 50) + (req_mythic_pieces * 500))
+                                            eff = saved / max(1, req_xp * 0.1)
                                             candidates.append({
-                                                "type": "hero_ascend", "idx": troop_idx, "label": f"🔺 Ascend {label} Hero Gear past Lvl {current_lvl} gate",
-                                                "cost": {"Mithril": req_mithril, "Mythic Piece": req_mythic_pieces}, "efficiency": eff, "saved": saved
+                                                "type": "hero_lvl", "troop": troop, "slot": slot, "label": f"Enhance {troop.capitalize()} {slot} to Lvl {current_lvl + 1} ({current_tier})",
+                                                "cost": {"XP": req_xp}, "efficiency": eff, "saved": saved
                                             })
-                                else:
-                                    # Regular incremental level processing loop
-                                    req_xp = calculate_hero_gear_xp_cost(current_lvl)
-                                    if loop_wallet["XP"] >= req_xp and current_lvl < 200:
-                                        test_profile = copy.deepcopy(loop_state_profile)
-                                        test_profile["hero_lvl"][troop_idx] += 1
-                                        test_surv = run_isolated_simulation(test_profile)
-                                        saved = max(0.001, test_surv - control_surv)
-                                        eff = saved / max(1, req_xp * 0.1)
-                                        candidates.append({
-                                            "type": "hero_lvl", "idx": troop_idx, "label": f"Enhance {label} Hero Gear to Lvl {current_lvl + 1} ({current_tier})",
-                                            "cost": {"XP": req_xp}, "efficiency": eff, "saved": saved
-                                        })
 
-                            # --- SCAN OPTION D: MASTERY FORGE STEPS ---
-                            for troop_idx, label in enumerate(["Infantry", "Cavalry", "Archer"]):
-                                current_mastery = loop_state_profile["hero_mastery"][troop_idx]
-                                if current_mastery < 20:
-                                    req_hammers = (current_mastery + 1) * 10
-                                    req_pieces = max(0, current_mastery - 9)
-                                    
-                                    if loop_wallet["Forgehammer"] >= req_hammers and loop_wallet["Mythic Piece"] >= req_pieces:
-                                        test_profile = copy.deepcopy(loop_state_profile)
-                                        test_profile["hero_mastery"][troop_idx] += 1
-                                        test_surv = run_isolated_simulation(test_profile)
-                                        saved = max(0.001, test_surv - control_surv)
-                                        eff = saved / max(1, req_hammers + (req_pieces * 500))
-                                        candidates.append({
-                                            "type": "hero_mastery", "idx": troop_idx, "label": f"⭐ Mastery Forge {label} Gear to Star Lvl {current_mastery + 1}",
-                                            "cost": {"Forgehammer": req_hammers, "Mythic Piece": req_pieces}, "efficiency": eff, "saved": saved
-                                        })
+                            # --- SCAN MASTERY FORGE STEPS ---
+                            for troop in ["infantry", "cavalry", "archer"]:
+                                for slot in ["Helm", "Gloves", "Chest", "Boots"]:
+                                    current_mastery = loop_state_profile[troop][slot]["mastery"]
+                                    if current_mastery < 20:
+                                        req_hammers = (current_mastery + 1) * 10
+                                        req_pieces = max(0, current_mastery - 9)
+                                        
+                                        if loop_wallet["Forgehammer"] >= req_hammers and loop_wallet["Mythic Piece"] >= req_pieces:
+                                            test_profile = copy.deepcopy(loop_state_profile)
+                                            test_profile[troop][slot]["mastery"] += 1
+                                            test_surv = run_isolated_simulation(test_profile)
+                                            saved = max(0.001, test_surv - control_surv)
+                                            eff = saved / max(1, req_hammers + (req_pieces * 500))
+                                            candidates.append({
+                                                "type": "hero_mastery", "troop": troop, "slot": slot, "label": f"⭐ Mastery Forge {troop.capitalize()} {slot} to Star Lvl {current_mastery + 1}",
+                                                "cost": {"Forgehammer": req_hammers, "Mythic Piece": req_pieces}, "efficiency": eff, "saved": saved
+                                            })
 
                             if not candidates:
                                 break
@@ -1363,14 +1381,10 @@ with tab_gear:
                                 loop_wallet[name] -= value
                                 
                             # Execute targeted state mutations
-                            if winner["type"] == "charms":
-                                loop_state_profile["charms"][winner["idx"]] += 1
-                            elif winner["type"] == "gov":
-                                loop_state_profile["gov"][winner["idx"]] += 1
-                            elif winner["type"] == "hero_lvl" or winner["type"] == "hero_ascend":
-                                loop_state_profile["hero_lvl"][winner["idx"]] += 1
+                            if winner["type"] == "hero_lvl" or winner["type"] == "hero_ascend":
+                                loop_state_profile[winner["troop"]][winner["slot"]]["lvl"] += 1
                             elif winner["type"] == "hero_mastery":
-                                loop_state_profile["hero_mastery"][winner["idx"]] += 1
+                                loop_state_profile[winner["troop"]][winner["slot"]]["mastery"] += 1
 
                             cost_string = ", ".join([f"{v:,.0f}x {k}" for k, v in winner["cost"].items()])
                             current_roadmap.append({
@@ -1403,3 +1417,4 @@ with tab_gear:
                         rem_col4.metric("Remaining Mythic Pieces", f"{best_wallet_remainder['Mythic Piece']:,.0f}")
                     else:
                         st.error("❌ The algorithm was unable to process an upgrade link. Verify your input balances.")
+    
