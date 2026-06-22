@@ -1091,9 +1091,10 @@ with tab_roi:
             else:
                 st.button("🚀 Run Multi-Variable Allocation Analysis", disabled=True, key="r_run_disabled")
                # =========================================================================
+    # =========================================================================
     # --- TAB 4: SURGICAL HERO GEAR OPTIMIZER ---
     # =========================================================================
-with tab_gear:
+    with tab_gear:
         st.header("🎯 Surgical Hero Gear Optimizer")
         st.caption("A granular, slot-specific optimizer that calculates exact combat ROI for Helm, Glove, Chest, and Boot upgrades.")
 
@@ -1109,66 +1110,66 @@ with tab_gear:
             180: [14, 40, 10]  # 160 -> 180 bracket step
         }
 
-        def run_isolated_simulation(profile_state):
-                        """Dynamically maps active gear choices onto combat arrays to measure custom troop retention values."""
-                        # Establish standard base configurations
-                        my_stats_matrix = np.array([
-                            [my_base_atk, my_base_def, my_base_atk - 100.0, my_base_def + 100.0],  # Infantry [Atk, Def, Let, HP]
-                            [my_base_atk - 50.0, my_base_def - 50.0, my_base_atk - 150.0, my_base_def - 50.0],  # Cavalry
-                            [my_base_atk + 100.0, my_base_def - 100.0, my_base_atk, my_base_def - 100.0]   # Archer
-                        ])
-                        
-                        opp_stats_matrix = np.array([
-                            [opp_base_atk, opp_base_def, opp_base_atk - 100.0, opp_base_def + 100.0],
-                            [opp_base_atk - 50.0, opp_base_def - 50.0, opp_base_atk - 150.0, opp_base_def - 50.0],
-                            [opp_base_atk + 100.0, opp_base_def - 100.0, opp_base_atk, opp_base_def - 100.0]
-                        ])
-                        
-                        # Apply gear stat deltas to the correct side based on role choice
-                        troop_keys = ["infantry", "cavalry", "archer"]
-                        
-                        target_matrix = my_stats_matrix if opt_role == "Rally Attacker" else opp_stats_matrix
-                        active_profile = profile_state if opt_role == "Rally Attacker" else current_profile # Keep control stable if defending
-                        
-                        # Compute deltas directly into the designated matrix array
-                        for r, troop in enumerate(troop_keys):
-                            # 1. Helms & Boots handle Lethality (Index 2)
-                            h_boost = get_hero_gear_stat(active_profile[troop]["Helm"]["tier"], active_profile[troop]["Helm"]["lvl"]) * 100.0
-                            h_final = h_boost * (1.0 + (active_profile[troop]["Helm"]["mastery"] * 0.10))
-                            
-                            b_boost = get_hero_gear_stat(active_profile[troop]["Boots"]["tier"], active_profile[troop]["Boots"]["lvl"]) * 100.0
-                            b_final = b_boost * (1.0 + (active_profile[troop]["Boots"]["mastery"] * 0.10))
-                            
-                            target_matrix[r, 2] += (h_final + b_final)
-                            
-                            # 2. Gloves & Chests handle Health (Index 3)
-                            g_boost = get_hero_gear_stat(active_profile[troop]["Gloves"]["tier"], active_profile[troop]["Gloves"]["lvl"]) * 100.0
-                            g_final = g_boost * (1.0 + (active_profile[troop]["Gloves"]["mastery"] * 0.10))
-                            
-                            c_boost = get_hero_gear_stat(active_profile[troop]["Chest"]["tier"], active_profile[troop]["Chest"]["lvl"]) * 100.0
-                            c_final = c_boost * (1.0 + (active_profile[troop]["Chest"]["mastery"] * 0.10))
-                            
-                            target_matrix[r, 3] += (g_final + c_final)
+        # -------------------------------------------------------------------------
+        # --- COMBAT INTEGRATION CONFIG PANEL (FULL WIDTH) ---
+        # -------------------------------------------------------------------------
+        st.markdown("### ⚔️ Battle Context & Deployment Settings")
+        st.caption("Configure the deployment profile and operational role to test your gear upgrades in a real match scenario.")
 
-                        # Assemble dynamic TroopSide elements
-                        my_march = TroopSide([my_inf, my_cav, my_arc], my_stats_matrix, [my_h1, my_h2, my_h3], ["None"]*4)
-                        opp_march = TroopSide([opp_inf, opp_cav, opp_arc], opp_stats_matrix, [opp_h1, opp_h2, opp_h3], ["None"]*4)
-                        
-                        # Assign Attacker vs Defender labels to process widget logic boundaries correctly
-                        attacker_side = my_march if opt_role == "Rally Attacker" else opp_march
-                        defender_side = opp_march if opt_role == "Rally Attacker" else my_march
-                        
-                        total_surviving_target = 0
-                        for _ in range(mc_precision):
-                            res = kingshot_multirally_sim2([copy.deepcopy(attacker_side)], copy.deepcopy(defender_side))
-                            # Track surviving counts based on what role you are optimizing for
-                            if opt_role == "Rally Attacker":
-                                total_surviving_target += np.sum(res[1][0]['attacker_surviving'])
-                            else:
-                                total_surviving_target += np.sum(res[0].troops)
-                                
-                        return total_surviving_target / mc_precision
+        role_col, prec_col = st.columns(2)
+        with role_col:
+            opt_role = st.radio(
+                "Target Optimization Strategy Role",
+                ["Rally Attacker", "Garrison Defender"],
+                help="Selects whether your hero gear upgrades are simulated as the attacking force or the defending wall garrison.",
+                horizontal=True,
+                key="g_opt_role"
+            )
+        with prec_col:
+            mc_precision = st.slider("Greedy Search Pass Precision (Monte Carlo)", 10, 150, 40, step=10, key="g_precision_slider")
 
+        # Layout containers for active army scaling parameters
+        ctx_exp1, ctx_exp2 = st.columns(2)
+        
+        with ctx_exp1:
+            st.markdown("#### 🏹 Your Deployment Profile")
+            my_inf = st.number_input("Your Infantry Count", min_value=0, value=500000, step=50000, key="g_my_inf")
+            my_cav = st.number_input("Your Cavalry Count", min_value=0, value=200000, step=50000, key="g_my_cav")
+            my_arc = st.number_input("Your Archer Count", min_value=0, value=300000, step=50000, key="g_my_arc")
+            
+            st.markdown("**Your Active Hero Selection**")
+            h_col1, h_col2, h_col3 = st.columns(3)
+            my_h1 = h_col1.selectbox("Leader 1", ["Amadeus", "Hilde", "Marlin", "Petra", "Helga", "Saul", "None"], index=0, key="g_my_h1")
+            my_h2 = h_col2.selectbox("Leader 2", ["Amadeus", "Hilde", "Marlin", "Petra", "Helga", "Saul", "None"], index=1, key="g_my_h2")
+            my_h3 = h_col3.selectbox("Leader 3", ["Amadeus", "Hilde", "Marlin", "Petra", "Helga", "Saul", "None"], index=2, key="g_my_h3")
+            
+            st.markdown("**Your Base Combat Stats (Excluding Hero Gear)**")
+            bs_col1, bs_col2 = st.columns(2)
+            my_base_atk = bs_col1.number_input("Base Attack %", value=1200.0, step=50.0, key="g_my_base_atk")
+            my_base_def = bs_col2.number_input("Base Defense %", value=1000.0, step=50.0, key="g_my_base_def")
+
+        with ctx_exp2:
+            st.markdown("#### 🛡️ Rival Target Environment")
+            opp_inf = st.number_input("Rival Infantry Count", min_value=0, value=600000, step=50000, key="g_opp_inf")
+            opp_cav = st.number_input("Rival Cavalry Count", min_value=0, value=400000, step=50000, key="g_opp_cav")
+            opp_arc = st.number_input("Rival Archer Count", min_value=0, value=400000, step=50000, key="g_opp_arc")
+            
+            st.markdown("**Rival Active Hero Selection**")
+            oh_col1, oh_col2, oh_col3 = st.columns(3)
+            opp_h1 = oh_col1.selectbox("Rival Leader 1", ["Amadeus", "Hilde", "Marlin", "Petra", "Helga", "Saul", "None"], index=0, key="g_opp_h1")
+            opp_h2 = oh_col2.selectbox("Rival Leader 2", ["Amadeus", "Hilde", "Marlin", "Petra", "Helga", "Saul", "None"], index=1, key="g_opp_h2")
+            opp_h3 = oh_col3.selectbox("Rival Leader 3", ["Amadeus", "Hilde", "Marlin", "Petra", "Helga", "Saul", "None"], index=2, key="g_opp_h3")
+            
+            st.markdown("**Rival Combat Stats Baseline**")
+            obs_col1, obs_col2 = st.columns(2)
+            opp_base_atk = obs_col1.number_input("Rival Attack %", value=1300.0, step=50.0, key="g_opp_base_atk")
+            opp_base_def = obs_col2.number_input("Rival Defense %", value=1100.0, step=50.0, key="g_opp_base_def")
+
+        st.markdown("---")
+
+        # -------------------------------------------------------------------------
+        # --- INVENTORY & GEAR STATE COLUMNS ---
+        # -------------------------------------------------------------------------
         g_main, g_side = st.columns([2, 1])
 
         with g_side:
@@ -1190,16 +1191,9 @@ with tab_gear:
                 inv_mithril = st.number_input("Available Mithril", min_value=0, value=15, key="g_inv_mithril")
                 inv_mythic_pieces = st.number_input("Available Mythic Gear Duplicates", min_value=0, value=4, key="g_inv_pieces")
 
-            with st.expander("🛡️ Target Defense Environment (Rival Wall)"):
-                env_inf = st.number_input("Threat Target Infantry Array Count", value=1200000, key="g_env_inf")
-                env_stats = st.number_input("Target Defensive Baseline Armor %", value=1400.0, key="g_env_stats")
-
         with g_main:
             st.markdown("### 🏛️ Active Structural Profiles")
-            
-            t_c1, t_c2 = st.columns(2)
-            mc_precision = t_c1.slider("Greedy Search Pass Precision (Monte Carlo)", 10, 150, 40, step=10, key="g_precision_slider")
-            monotonicity_guard = t_c2.toggle("Engage Monotonicity Guard", value=True, key="g_mono_toggle")
+            monotonicity_guard = st.toggle("Engage Monotonicity Guard", value=True, key="g_mono_toggle")
             
             st.markdown("#### Granular Hero Gear States")
             st_c1, st_c2, st_c3 = st.columns(3)
@@ -1260,43 +1254,64 @@ with tab_gear:
                     }
                     
                     def run_isolated_simulation(profile_state):
-                        """Translates active tier choices into a simulated match to gather troop retention counts."""
-                        sim_stats = np.array([
-                            [1400.0, 1100.0, 1300.0, 1200.0],  # Infantry [Atk, Def, Let, HP]
-                            [1300.0, 1000.0, 1200.0, 1100.0],  # Cavalry
-                            [1450.0, 1050.0, 1350.0, 1150.0]   # Archer
+                        """Dynamically maps active gear choices onto combat arrays to measure custom troop retention values."""
+                        # Establish standard base configurations
+                        my_stats_matrix = np.array([
+                            [my_base_atk, my_base_def, my_base_atk - 100.0, my_base_def + 100.0],  # Infantry [Atk, Def, Let, HP]
+                            [my_base_atk - 50.0, my_base_def - 50.0, my_base_atk - 150.0, my_base_def - 50.0],  # Cavalry
+                            [my_base_atk + 100.0, my_base_def - 100.0, my_base_atk, my_base_def - 100.0]   # Archer
                         ])
                         
-                        troop_keys = ["infantry", "cavalry", "archer"]
-                        for r, troop in enumerate(troop_keys):
-                            
-                            # 1. Helms & Boots apply strictly to Lethality (Index 2)
-                            helm_boost = get_hero_gear_stat(profile_state[troop]["Helm"]["tier"], profile_state[troop]["Helm"]["lvl"]) * 100.0
-                            helm_final = helm_boost * (1.0 + (profile_state[troop]["Helm"]["mastery"] * 0.10))
-                            
-                            boots_boost = get_hero_gear_stat(profile_state[troop]["Boots"]["tier"], profile_state[troop]["Boots"]["lvl"]) * 100.0
-                            boots_final = boots_boost * (1.0 + (profile_state[troop]["Boots"]["mastery"] * 0.10))
-                            
-                            sim_stats[r, 2] += (helm_final + boots_final)
-                            
-                            # 2. Gloves & Chests apply strictly to Health (Index 3)
-                            gloves_boost = get_hero_gear_stat(profile_state[troop]["Gloves"]["tier"], profile_state[troop]["Gloves"]["lvl"]) * 100.0
-                            gloves_final = gloves_boost * (1.0 + (profile_state[troop]["Gloves"]["mastery"] * 0.10))
-                            
-                            chest_boost = get_hero_gear_stat(profile_state[troop]["Chest"]["tier"], profile_state[troop]["Chest"]["lvl"]) * 100.0
-                            chest_final = chest_boost * (1.0 + (profile_state[troop]["Chest"]["mastery"] * 0.10))
-                            
-                            sim_stats[r, 3] += (gloves_final + chest_final)
-
-                        attacker = TroopSide([500000, 200000, 300000], sim_stats, ["Amadeus", "Hilde", "Marlin"], ["Chenko", "Gordon", "None", "None"])
-                        defender = TroopSide([env_inf, 400000, 400000], np.array([[env_stats]*4]*3), ["Amadeus", "Hilde", "Marlin"], ["Chenko", "None", "None", "None"])
+                        opp_stats_matrix = np.array([
+                            [opp_base_atk, opp_base_def, opp_base_atk - 100.0, opp_base_def + 100.0],
+                            [opp_base_atk - 50.0, opp_base_def - 50.0, opp_base_atk - 150.0, opp_base_def - 50.0],
+                            [opp_base_atk + 100.0, opp_base_def - 100.0, opp_base_atk, opp_base_def - 100.0]
+                        ])
                         
-                        total_surviving_troops = 0
-                        for _ in range(mc_precision):
-                            res = kingshot_multirally_sim2([copy.deepcopy(attacker)], copy.deepcopy(defender))
-                            total_surviving_troops += np.sum(res[0].troops)
+                        # Apply gear stat deltas to the correct side based on role choice
+                        troop_keys = ["infantry", "cavalry", "archer"]
+                        
+                        target_matrix = my_stats_matrix if opt_role == "Rally Attacker" else opp_stats_matrix
+                        active_profile = profile_state if opt_role == "Rally Attacker" else current_profile # Keep control stable if defending
+                        
+                        # Compute deltas directly into the designated matrix array
+                        for r, troop in enumerate(troop_keys):
+                            # 1. Helms & Boots handle Lethality (Index 2)
+                            h_boost = get_hero_gear_stat(active_profile[troop]["Helm"]["tier"], active_profile[troop]["Helm"]["lvl"]) * 100.0
+                            h_final = h_boost * (1.0 + (active_profile[troop]["Helm"]["mastery"] * 0.10))
                             
-                        return total_surviving_troops / mc_precision
+                            b_boost = get_hero_gear_stat(active_profile[troop]["Boots"]["tier"], active_profile[troop]["Boots"]["lvl"]) * 100.0
+                            b_final = b_boost * (1.0 + (active_profile[troop]["Boots"]["mastery"] * 0.10))
+                            
+                            target_matrix[r, 2] += (h_final + b_final)
+                            
+                            # 2. Gloves & Chests handle Health (Index 3)
+                            g_boost = get_hero_gear_stat(active_profile[troop]["Gloves"]["tier"], active_profile[troop]["Gloves"]["lvl"]) * 100.0
+                            g_final = g_boost * (1.0 + (active_profile[troop]["Gloves"]["mastery"] * 0.10))
+                            
+                            c_boost = get_hero_gear_stat(active_profile[troop]["Chest"]["tier"], active_profile[troop]["Chest"]["lvl"]) * 100.0
+                            c_final = c_boost * (1.0 + (active_profile[troop]["Chest"]["mastery"] * 0.10))
+                            
+                            target_matrix[r, 3] += (g_final + c_final)
+
+                        # Assemble dynamic TroopSide elements
+                        my_march = TroopSide([my_inf, my_cav, my_arc], my_stats_matrix, [my_h1, my_h2, my_h3], ["None"]*4)
+                        opp_march = TroopSide([opp_inf, opp_cav, opp_arc], opp_stats_matrix, [opp_h1, opp_h2, opp_h3], ["None"]*4)
+                        
+                        # Assign Attacker vs Defender labels to process widget logic boundaries correctly
+                        attacker_side = my_march if opt_role == "Rally Attacker" else opp_march
+                        defender_side = opp_march if opt_role == "Rally Attacker" else my_march
+                        
+                        total_surviving_target = 0
+                        for _ in range(mc_precision):
+                            res = kingshot_multirally_sim2([copy.deepcopy(attacker_side)], copy.deepcopy(defender_side))
+                            # Track surviving counts based on what role you are optimizing for
+                            if opt_role == "Rally Attacker":
+                                total_surviving_target += np.sum(res[1][0]['attacker_surviving'])
+                            else:
+                                total_surviving_target += np.sum(res[0].troops)
+                                
+                        return total_surviving_target / mc_precision
 
                     # --- MULTI-BUDGET LOGIC TETHERING ---
                     budget_multipliers = [1.0, 0.90, 0.80] if monotonicity_guard else [1.0]
@@ -1417,4 +1432,3 @@ with tab_gear:
                         rem_col4.metric("Remaining Mythic Pieces", f"{best_wallet_remainder['Mythic Piece']:,.0f}")
                     else:
                         st.error("❌ The algorithm was unable to process an upgrade link. Verify your input balances.")
-    
