@@ -7,11 +7,22 @@ try:
 except FileNotFoundError:
     print("WARNING: troop_stats.csv not found. Engine requires base stats to run.")
 
+# Create a global dictionary to hold the cache
+BASE_STAT_CACHE = {}
+
 def get_base_stats(troop_type, tier, tg_level):
-    row = TROOP_DB[(TROOP_DB['Type'] == troop_type) & 
-                   (TROOP_DB['Tier'] == tier) & 
-                   (TROOP_DB['TG'] == tg_level)]
-    return row[['Attack', 'Defense', 'Lethality', 'Health']].values[0]
+    """Fetches base stats using a high-speed dictionary cache to bypass Pandas bottleneck."""
+    cache_key = (troop_type, tier, tg_level)
+    
+    # If we haven't looked this up yet, do the slow Pandas search ONCE
+    if cache_key not in BASE_STAT_CACHE:
+        row = TROOP_DB[(TROOP_DB['Type'] == troop_type) & 
+                       (TROOP_DB['Tier'] == tier) & 
+                       (TROOP_DB['TG'] == tg_level)]
+        BASE_STAT_CACHE[cache_key] = row[['Attack', 'Defense', 'Lethality', 'Health']].values[0]
+        
+    # Return the instant dictionary lookup
+    return BASE_STAT_CACHE[cache_key]
 
 class TroopSide:
     def __init__(self, troops, stats, leader_heroes, supporter_heroes, tier=10, tg_level=5, widget_levels=None):
