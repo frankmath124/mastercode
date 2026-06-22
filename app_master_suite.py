@@ -799,7 +799,7 @@ else:
                                     test_troops = [o_g_total_troops * r[0], o_g_total_troops * r[1], o_g_total_troops * r[2]]
                                     g_setup = TroopSide(test_troops, np.array(o_g_combat_stats), [o_g_lead1, o_g_lead2, o_g_lead3], o_g_sup_heroes, o_g_tier, o_g_tg, o_g_widgets)
                                     w_set = build_waves_opt()
-                                    tot_surv = sum(np.sum(kingshot_multirally_sim2([w.clone() for w in w_set], copy.deepcopy(g_setup))[0].troops) for _ in range(o_mc_runs))
+                                    tot_surv = sum(np.sum(kingshot_multirally_sim2([w.clone() for w in w_set], g_setup.clone())[0].troops) for _ in range(o_mc_runs))
                                     avg_surv = tot_surv / o_mc_runs
                                     results_grid.append({"Configuration": f"Inf: {r[0]*100:.0f}% | Cav: {r[1]*100:.0f}% | Arc: {r[2]*100:.0f}%", "Avg Survivors": avg_surv, "Rate": (avg_surv / o_g_total_troops) * 100})
                             
@@ -808,7 +808,7 @@ else:
                                 for combo in combos:
                                     g_setup = TroopSide([o_g_inf, o_g_cav, o_g_arc], np.array(o_g_combat_stats), [o_g_lead1, o_g_lead2, o_g_lead3], list(combo), o_g_tier, o_g_tg, o_g_widgets)
                                     w_set = build_waves_opt()
-                                    tot_surv = sum(np.sum(kingshot_multirally_sim2([w.clone() for w in w_set], copy.deepcopy(g_setup))[0].troops) for _ in range(o_mc_runs))
+                                    tot_surv = sum(np.sum(kingshot_multirally_sim2([w.clone() for w in w_set], g_setup.clone())[0].troops) for _ in range(o_mc_runs))
                                     avg_surv = tot_surv / o_mc_runs
                                     results_grid.append({"Configuration": f"{', '.join(combo)}", "Avg Survivors": avg_surv, "Rate": (avg_surv / max(1, o_g_total_troops)) * 100})
                             
@@ -818,7 +818,7 @@ else:
                                 for r in ratio_grid:
                                     test_w1_troops = [w1_cap * r[0], w1_cap * r[1], w1_cap * r[2]]
                                     w_set = build_waves_opt(wave_1_override_troops=test_w1_troops)
-                                    tot_surv = sum(np.sum(kingshot_multirally_sim2([w.clone() for w in w_set], copy.deepcopy(g_setup))[0].troops) for _ in range(o_mc_runs))
+                                    tot_surv = sum(np.sum(kingshot_multirally_sim2([w.clone() for w in w_set], g_setup.clone())[0].troops) for _ in range(o_mc_runs))
                                     avg_surv = tot_surv / o_mc_runs
                                     results_grid.append({"Configuration": f"Wave 1 -> Inf: {r[0]*100:.0f}% | Cav: {r[1]*100:.0f}% | Arc: {r[2]*100:.0f}%", "Avg Survivors": avg_surv, "Rate": (avg_surv / max(1, o_g_total_troops)) * 100})
                             
@@ -832,7 +832,7 @@ else:
                                     a_surv_sum = 0
                                     
                                     for _ in range(o_mc_runs):
-                                        final_g, logs = kingshot_multirally_sim2([w.clone() for w in w_set], copy.deepcopy(g_setup))
+                                        final_g, logs = kingshot_multirally_sim2([w.clone() for w in w_set], g_setup.clone())
                                         g_surv_sum += np.sum(final_g.troops)
                                         a_surv_sum += sum(np.sum(log['attacker_surviving']) for log in logs)
                                         
@@ -1048,9 +1048,8 @@ else:
                             for current_step in range(1, total_steps + 1):
                                 # Calculate control survival for this specific step's baseline
                                 control_garrison = TroopSide([r_g_inf, r_g_cav, r_g_arc], np.array(active_stats), [r_g_lead1, r_g_lead2, r_g_lead3], r_g_sups, r_g_tier, r_g_tg, r_g_widgets)
-                                control_avg = sum(np.sum(kingshot_multirally_sim2([wave.clone() for wave in rally_waves_input], copy.deepcopy(control_garrison))[0].troops) for _ in range(r_mc_runs)) / r_mc_runs
-                                
-                                step_leaderboard = []
+                                control_avg = sum(np.sum(kingshot_multirally_sim2([w.clone() for w in rally_waves_input], control_garrison.clone())[0].troops) for _ in range(r_mc_runs)) / r_mc_runs
+
                                 
                                 # Test adding our increment to every individual node
                                 for label, row, col in stat_map:
@@ -1058,8 +1057,7 @@ else:
                                     nudged_stats[row][col] += step_size
                                     
                                     test_garrison = TroopSide([r_g_inf, r_g_cav, r_g_arc], np.array(nudged_stats), [r_g_lead1, r_g_lead2, r_g_lead3], r_g_sups, r_g_tier, r_g_tg, r_g_widgets)
-                                    test_avg = sum(np.sum(kingshot_multirally_sim2([wave.clone() for wave in rally_waves_input], copy.deepcopy(test_garrison))[0].troops) for _ in range(r_mc_runs)) / r_mc_runs
-                                    
+                                    test_avg = sum(np.sum(kingshot_multirally_sim2([w.clone() for w in rally_waves_input], test_garrison.clone())[0].troops) for _ in range(r_mc_runs)) / r_mc_runs
                                     saved_troops = max(0.0, test_avg - control_avg)
                                     step_leaderboard.append({'label': label, 'row': row, 'col': col, 'saved': saved_troops})
                                 
