@@ -1335,7 +1335,7 @@ else:
                             
                             total_surviving_target = 0
                             for _ in range(mc_precision):
-                                res = kingshot_multirally_sim2([copy.deepcopy(attacker_side)], defender_side.clone())
+                                res = kingshot_multirally_sim2([attacker_side.clone()], defender_side.clone())
                                 if opt_role == "Rally Attacker":
                                     total_surviving_target += np.sum(res[1][0]['attacker_surviving'])
                                 else:
