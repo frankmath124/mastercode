@@ -1196,45 +1196,38 @@ with tab_gear:
             monotonicity_guard = st.toggle("Engage Monotonicity Guard", value=True, key="g_mono_toggle")
             
             st.markdown("#### Granular Hero Gear States")
-            st_c1, st_c2, st_c3 = st.columns(3)
             
-            def create_gear_slot_ui(troop, slot, default_tier, default_lvl, default_mast):
+            def create_gear_slot_ui(slot_name, default_tier, default_lvl, default_mast, key_prefix):
                 """Helper function to cleanly generate UI for specific gear slots."""
-                st.markdown(f"**{troop} {slot}**")
-                tier = st.selectbox("Tier", ["Epic", "Mythic", "Red"], index=["Epic", "Mythic", "Red"].index(default_tier), key=f"g_{troop.lower()}_{slot.lower()}_t")
-                lvl = st.number_input("Enhance Lvl", 0, 200, default_lvl, key=f"g_{troop.lower()}_{slot.lower()}_l")
-                mast = st.number_input("Mastery Lvl", 0, 20, default_mast, key=f"g_{troop.lower()}_{slot.lower()}_m")
+                st.markdown(f"**{slot_name}**")
+                tier = st.selectbox("Tier", ["Epic", "Mythic", "Red"], index=["Epic", "Mythic", "Red"].index(default_tier), key=f"{key_prefix}_t")
+                lvl = st.number_input("Enhance Lvl", 0, 200, default_lvl, key=f"{key_prefix}_l")
+                mast = st.number_input("Mastery", 0, 20, default_mast, key=f"{key_prefix}_m")
                 return {"tier": tier, "lvl": lvl, "mastery": mast}
 
-            # Row 1: Infantry Asset Matrix Input
-            with st_c1:
-                inf_helm = create_gear_slot_ui("Infantry", "Helm", "Mythic", 83, 4)
-                st.markdown("---")
-                inf_gloves = create_gear_slot_ui("Infantry", "Gloves", "Red", 120, 11)
-                st.markdown("---")
-                inf_chest = create_gear_slot_ui("Infantry", "Chest", "Mythic", 100, 7)
-                st.markdown("---")
-                inf_boots = create_gear_slot_ui("Infantry", "Boots", "Mythic", 85, 5)
+            # 🛡️ INFANTRY BLOCK
+            with st.expander("🛡️ Infantry Hero Gear", expanded=True):
+                i_c1, i_c2, i_c3, i_c4 = st.columns(4)
+                with i_c1: inf_helm = create_gear_slot_ui("Helm (Lethality)", "Mythic", 83, 4, "g_inf_helm")
+                with i_c2: inf_gloves = create_gear_slot_ui("Gloves (Health)", "Red", 120, 11, "g_inf_gloves")
+                with i_c3: inf_chest = create_gear_slot_ui("Chest (Health)", "Mythic", 100, 7, "g_inf_chest")
+                with i_c4: inf_boots = create_gear_slot_ui("Boots (Lethality)", "Mythic", 85, 5, "g_inf_boots")
             
-            # Row 2: Cavalry Asset Matrix Input
-            with st_c2:
-                cav_helm = create_gear_slot_ui("Cavalry", "Helm", "Mythic", 87, 5)
-                st.markdown("---")
-                cav_gloves = create_gear_slot_ui("Cavalry", "Gloves", "Mythic", 48, 1)
-                st.markdown("---")
-                cav_chest = create_gear_slot_ui("Cavalry", "Chest", "Mythic", 48, 1)
-                st.markdown("---")
-                cav_boots = create_gear_slot_ui("Cavalry", "Boots", "Mythic", 87, 5)
+            # 🏇 CAVALRY BLOCK
+            with st.expander("🏇 Cavalry Hero Gear", expanded=True):
+                c_c1, c_c2, c_c3, c_c4 = st.columns(4)
+                with c_c1: cav_helm = create_gear_slot_ui("Helm (Lethality)", "Mythic", 87, 5, "g_cav_helm")
+                with c_c2: cav_gloves = create_gear_slot_ui("Gloves (Health)", "Mythic", 48, 1, "g_cav_gloves")
+                with c_c3: cav_chest = create_gear_slot_ui("Chest (Health)", "Mythic", 48, 1, "g_cav_chest")
+                with c_c4: cav_boots = create_gear_slot_ui("Boots (Lethality)", "Mythic", 87, 5, "g_cav_boots")
             
-            # Row 3: Archer Asset Matrix Input
-            with st_c3:
-                arc_helm = create_gear_slot_ui("Archer", "Helm", "Mythic", 84, 5)
-                st.markdown("---")
-                arc_gloves = create_gear_slot_ui("Archer", "Gloves", "Mythic", 61, 2)
-                st.markdown("---")
-                arc_chest = create_gear_slot_ui("Archer", "Chest", "Mythic", 61, 2)
-                st.markdown("---")
-                arc_boots = create_gear_slot_ui("Archer", "Boots", "Mythic", 87, 5)
+            # 🏹 ARCHER BLOCK
+            with st.expander("🏹 Archer Hero Gear", expanded=True):
+                a_c1, a_c2, a_c3, a_c4 = st.columns(4)
+                with a_c1: arc_helm = create_gear_slot_ui("Helm (Lethality)", "Mythic", 84, 5, "g_arc_helm")
+                with a_c2: arc_gloves = create_gear_slot_ui("Gloves (Health)", "Mythic", 61, 2, "g_arc_gloves")
+                with a_c3: arc_chest = create_gear_slot_ui("Chest (Health)", "Mythic", 61, 2, "g_arc_chest")
+                with a_c4: arc_boots = create_gear_slot_ui("Boots (Lethality)", "Mythic", 87, 5, "g_arc_boots")
 
             st.markdown("---")
             
