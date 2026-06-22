@@ -25,6 +25,20 @@ def get_base_stats(troop_type, tier, tg_level):
     return BASE_STAT_CACHE[cache_key]
 
 class TroopSide:
+    def clone(self):
+        """High-speed cloning method to bypass copy.deepcopy overhead."""
+        cloned = TroopSide(
+            np.copy(self.troops), 
+            np.copy(self.bonus_stats_percentage), 
+            self.leader_heroes[:], 
+            self.supporter_heroes[:], 
+            self.tier, 
+            self.tg_level, 
+            self.widget_levels[:]
+        )
+        cloned.true_base_stats = np.copy(self.true_base_stats)
+        cloned.final_combat_stats = np.copy(self.final_combat_stats)
+        return cloned
     def __init__(self, troops, stats, leader_heroes, supporter_heroes, tier=10, tg_level=5, widget_levels=None):
         self.troops = np.array(troops, dtype=float)
         self.bonus_stats_percentage = np.array(stats, dtype=float) 
