@@ -22,17 +22,20 @@ class TroopSide:
         self.tier = tier 
         self.tg_level = tg_level 
         self.widget_levels = widget_levels if widget_levels else [10] * 7 
-        self.widget_bonus = self.calculate_widget_bonus()
         
         types = ['infantry', 'cavalry', 'archers']
         self.true_base_stats = np.zeros((3, 4))
         for i, t_type in enumerate(types):
             self.true_base_stats[i] = get_base_stats(t_type, self.tier, self.tg_level)
 
+        # Apply standard bonuses only. Widgets are now handled dynamically in combat!
         self.final_combat_stats = self.true_base_stats * (1.0 + (self.bonus_stats_percentage / 100.0))
-        widget_multiplier = 1.0 + (self.widget_bonus / 100.0)
-        self.final_combat_stats[:, 0] *= widget_multiplier
-        self.final_combat_stats[:, 1] *= widget_multiplier
+
+    @property
+    def stats(self):
+        return self.final_combat_stats
+
+        
 
     def calculate_widget_bonus(self):
         total_bonus = 0.0
@@ -168,23 +171,49 @@ def kingshot_multirally_sim2(rally_waves, garrison, max_rounds=200):
         a_mods = CombatMods()
         d_mods = CombatMods()
         
-        for hero_name in attacker.leader_heroes:
+     # --- ATTACKER HERO PROCESSING ---
+        for i, hero_name in enumerate(attacker.leader_heroes):
             if hero_name and hero_name != "None" and hero_name in hero_db:
                 hero = hero_db[hero_name]
                 a_mods = apply_skill(hero['skill1'], a_mods)
                 a_mods = apply_skill(hero['skill2'], a_mods)
                 a_mods = apply_skill(hero['skill3'], a_mods)
+                
+                # Gatekeeper: Does the widget exist, and is it a Rally scenario?
                 if hero.get('widget', {}).get('has_widget') and hero['widget']['scenario'] == 'rally':
+                    # 1. Apply the unique widget skill (e.g., Lethality +15%)
                     a_mods = apply_skill(hero['widget'], a_mods)
                     
-        for hero_name in current_garrison.leader_heroes:
+                    # 2. Apply the dynamic Base Stats based on widget level
+                    level = attacker.widget_levels[i]
+                    if level > 0:
+                        even_level = (level // 2) * 2
+                        base_bonus = (2.5 + (even_level / 2) * 2.5) / 100.0
+                        # Adds the base stats directly to the combat modifier
+                        a_mods.atk += base_bonus
+                        a_mods.def_val += base_bonus
+
+        # --- DEFENDER HERO PROCESSING ---
+        for i, hero_name in enumerate(current_garrison.leader_heroes):
             if hero_name and hero_name != "None" and hero_name in hero_db:
                 hero = hero_db[hero_name]
                 d_mods = apply_skill(hero['skill1'], d_mods)
                 d_mods = apply_skill(hero['skill2'], d_mods)
                 d_mods = apply_skill(hero['skill3'], d_mods)
+                
+                # Gatekeeper: Does the widget exist, and is it a Garrison scenario?
                 if hero.get('widget', {}).get('has_widget') and hero['widget']['scenario'] == 'garrison':
+                    # 1. Apply the unique widget skill (e.g., Dodge +5%)
                     d_mods = apply_skill(hero['widget'], d_mods)
+                    
+                    # 2. Apply the dynamic Base Stats based on widget level
+                    level = current_garrison.widget_levels[i]
+                    if level > 0:
+                        even_level = (level // 2) * 2
+                        base_bonus = (2.5 + (even_level / 2) * 2.5) / 100.0
+                        # Adds the base stats directly to the combat modifier
+                        d_mods.atk += base_bonus
+                        d_mods.def_val += base_bonus
                     
         for hero_name in attacker.supporter_heroes:
             if hero_name and hero_name != "None" and hero_name in hero_db:
