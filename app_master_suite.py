@@ -1524,5 +1524,5 @@ else:
                         rem_col2.metric("Remaining Forgehammers", f"{best_wallet_remainder['Forgehammer']:,.0f}")
                         rem_col3.metric("Remaining Mithril Blocks", f"{best_wallet_remainder['Mithril']:,.0f}")
                         rem_col4.metric("Remaining Mythic Pieces", f"{best_wallet_remainder['Mythic Piece']:,.0f}")
-                    else:
+                else:
                         st.error("❌ The algorithm was unable to process an upgrade link. Verify your input balances.")
