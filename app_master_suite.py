@@ -343,13 +343,17 @@ else:
         with col_desc3:
             st.markdown("### Stat Optimizer Engine")
             st.write("Isolate variables by injecting small stat changes. Calculates exactly how many fewer troop deaths an upgrade prevents to provide upgrade guidance.")
+        with col_desc4:
+            st.markdown("### Hero Gear Optimizer Engine")
+            st.write("Input Hero Gear as well as upgrade material decide if you want to optimize your defense or attack. Input current stats and for your desired opponent. The optimizer then uses..." \
+            "a greedy algorithm to determine which upgrade paths provide the best performance against the opponent ")
 
 # Replace your old tab layout row with this four-tab tuple:
     tab_sim, tab_opt, tab_roi, tab_gear = st.tabs([
         "Multi-Rally Simulator", 
         "Battle Optimizer", 
         "Stat Improvement Optimizer", 
-        "Gear & Charm Optimizer"
+        "Hero Gear Optimizer"
     ])
 
     # =========================================================================
@@ -1342,122 +1346,158 @@ else:
                             return total_surviving_target / mc_precision
 
                     # --- MULTI-BUDGET LOGIC TETHERING ---
-
                     budget_multipliers = [1.0, 0.90, 0.80] if monotonicity_guard else [1.0]
                     best_overall_roadmap = []
                     best_final_survival = -1
                     best_wallet_remainder = {}
+                    best_final_profile = {}
+                    best_piece_costs = {}
 
                     for budget_mod in budget_multipliers:
-                            loop_wallet = {k: int(v * budget_mod) for k, v in wallet.items()}
-                            loop_state_profile = copy.deepcopy(current_profile)
-                            current_roadmap = []
+                        loop_wallet = {k: int(v * budget_mod) for k, v in wallet.items()}
+                        loop_state_profile = copy.deepcopy(current_profile)
+                        current_roadmap = []
+                        # Track costs per piece dynamically during this run
+                        piece_costs = {t: {s: {} for s in ["Helm", "Gloves", "Chest", "Boots"]} for t in ["infantry", "cavalry", "archer"]}
+                        
+                        for iteration in range(1, 16):  # Computes chronological upgrade chains up to 15 actions out
+                            control_surv = run_isolated_simulation(loop_state_profile)
+                            candidates = []
                             
-                            for iteration in range(1, 16):  # Computes chronological upgrade chains up to 15 actions out
-                                control_surv = run_isolated_simulation(loop_state_profile)
-                                candidates = []
-                                
-                                # --- SCAN HERO GEAR ENHANCEMENTS AND BRACKET GATES ---
-                                for troop in ["infantry", "cavalry", "archer"]:
-                                    for slot in ["Helm", "Gloves", "Chest", "Boots"]:
-                                        current_lvl = loop_state_profile[troop][slot]["lvl"]
-                                        current_tier = loop_state_profile[troop][slot]["tier"]
-                                        current_mastery = loop_state_profile[troop][slot]["mastery"]
-                                        
-                                        if current_lvl in ascension_table:
-                                            # Target piece hits a gated threshold boundary line
-                                            req_mastery, req_mithril, req_mythic_pieces = ascension_table[current_lvl]
-                                            if current_mastery >= req_mastery:
-                                                if loop_wallet["Mithril"] >= req_mithril and loop_wallet["Mythic Piece"] >= req_mythic_pieces:
-                                                    test_profile = copy.deepcopy(loop_state_profile)
-                                                    test_profile[troop][slot]["lvl"] += 1
-                                                    if current_lvl == 100 and current_tier == "Mythic":
-                                                        test_profile[troop][slot]["tier"] = "Red"
-                                                        
-                                                    test_surv = run_isolated_simulation(test_profile)
-                                                    saved = max(0.001, test_surv - control_surv)
-                                                    eff = saved / max(1, (req_mithril * 50) + (req_mythic_pieces * 500))
-                                                    candidates.append({
-                                                        "type": "hero_ascend", "troop": troop, "slot": slot, "label": f"🔺 Ascend {troop.capitalize()} {slot} past Lvl {current_lvl} gate",
-                                                        "cost": {"Mithril": req_mithril, "Mythic Piece": req_mythic_pieces}, "efficiency": eff, "saved": saved
-                                                    })
-                                        else:
-                                            # Regular incremental level processing loop
-                                            req_xp = calculate_hero_gear_xp_cost(current_lvl)
-                                            if loop_wallet["XP"] >= req_xp and current_lvl < 200:
+                            # --- SCAN HERO GEAR ENHANCEMENTS AND BRACKET GATES ---
+                            for troop in ["infantry", "cavalry", "archer"]:
+                                for slot in ["Helm", "Gloves", "Chest", "Boots"]:
+                                    current_lvl = loop_state_profile[troop][slot]["lvl"]
+                                    current_tier = loop_state_profile[troop][slot]["tier"]
+                                    current_mastery = loop_state_profile[troop][slot]["mastery"]
+                                    
+                                    if current_lvl in ascension_table:
+                                        # Target piece hits a gated threshold boundary line
+                                        req_mastery, req_mithril, req_mythic_pieces = ascension_table[current_lvl]
+                                        if current_mastery >= req_mastery:
+                                            if loop_wallet["Mithril"] >= req_mithril and loop_wallet["Mythic Piece"] >= req_mythic_pieces:
                                                 test_profile = copy.deepcopy(loop_state_profile)
                                                 test_profile[troop][slot]["lvl"] += 1
+                                                if current_lvl == 100 and current_tier == "Mythic":
+                                                    test_profile[troop][slot]["tier"] = "Red"
+                                                    
                                                 test_surv = run_isolated_simulation(test_profile)
                                                 saved = max(0.001, test_surv - control_surv)
-                                                eff = saved / max(1, req_xp * 0.1)
+                                                eff = saved / max(1, (req_mithril * 50) + (req_mythic_pieces * 500))
                                                 candidates.append({
-                                                    "type": "hero_lvl", "troop": troop, "slot": slot, "label": f"Enhance {troop.capitalize()} {slot} to Lvl {current_lvl + 1} ({current_tier})",
-                                                    "cost": {"XP": req_xp}, "efficiency": eff, "saved": saved
+                                                    "type": "hero_ascend", "troop": troop, "slot": slot, "label": f"🔺 Ascend {troop.capitalize()} {slot} past Lvl {current_lvl} gate",
+                                                    "cost": {"Mithril": req_mithril, "Mythic Piece": req_mythic_pieces}, "efficiency": eff, "saved": saved
                                                 })
+                                    else:
+                                        # Regular incremental level processing loop
+                                        req_xp = calculate_hero_gear_xp_cost(current_lvl)
+                                        if loop_wallet["XP"] >= req_xp and current_lvl < 200:
+                                            test_profile = copy.deepcopy(loop_state_profile)
+                                            test_profile[troop][slot]["lvl"] += 1
+                                            test_surv = run_isolated_simulation(test_profile)
+                                            saved = max(0.001, test_surv - control_surv)
+                                            eff = saved / max(1, req_xp * 0.1)
+                                            candidates.append({
+                                                "type": "hero_lvl", "troop": troop, "slot": slot, "label": f"Enhance {troop.capitalize()} {slot} to Lvl {current_lvl + 1} ({current_tier})",
+                                                "cost": {"XP": req_xp}, "efficiency": eff, "saved": saved
+                                            })
 
-                                # --- SCAN MASTERY FORGE STEPS ---
-                                for troop in ["infantry", "cavalry", "archer"]:
-                                    for slot in ["Helm", "Gloves", "Chest", "Boots"]:
-                                        current_mastery = loop_state_profile[troop][slot]["mastery"]
-                                        if current_mastery < 20:
-                                            req_hammers = (current_mastery + 1) * 10
-                                            req_pieces = max(0, current_mastery - 9)
-                                            
-                                            if loop_wallet["Forgehammer"] >= req_hammers and loop_wallet["Mythic Piece"] >= req_pieces:
-                                                test_profile = copy.deepcopy(loop_state_profile)
-                                                test_profile[troop][slot]["mastery"] += 1
-                                                test_surv = run_isolated_simulation(test_profile)
-                                                saved = max(0.001, test_surv - control_surv)
-                                                eff = saved / max(1, req_hammers + (req_pieces * 500))
-                                                candidates.append({
-                                                    "type": "hero_mastery", "troop": troop, "slot": slot, "label": f"⭐ Mastery Forge {troop.capitalize()} {slot} to Star Lvl {current_mastery + 1}",
-                                                    "cost": {"Forgehammer": req_hammers, "Mythic Piece": req_pieces}, "efficiency": eff, "saved": saved
-                                                })
+                            # --- SCAN MASTERY FORGE STEPS ---
+                            for troop in ["infantry", "cavalry", "archer"]:
+                                for slot in ["Helm", "Gloves", "Chest", "Boots"]:
+                                    current_mastery = loop_state_profile[troop][slot]["mastery"]
+                                    if current_mastery < 20:
+                                        req_hammers = (current_mastery + 1) * 10
+                                        req_pieces = max(0, current_mastery - 9)
+                                        
+                                        if loop_wallet["Forgehammer"] >= req_hammers and loop_wallet["Mythic Piece"] >= req_pieces:
+                                            test_profile = copy.deepcopy(loop_state_profile)
+                                            test_profile[troop][slot]["mastery"] += 1
+                                            test_surv = run_isolated_simulation(test_profile)
+                                            saved = max(0.001, test_surv - control_surv)
+                                            eff = saved / max(1, req_hammers + (req_pieces * 500))
+                                            candidates.append({
+                                                "type": "hero_mastery", "troop": troop, "slot": slot, "label": f"⭐ Mastery Forge {troop.capitalize()} {slot} to Star Lvl {current_mastery + 1}",
+                                                "cost": {"Forgehammer": req_hammers, "Mythic Piece": req_pieces}, "efficiency": eff, "saved": saved
+                                            })
 
-                                if not candidates:
-                                    break
-                                    
-                                candidates.sort(key=lambda x: x["efficiency"], reverse=True)
-                                winner = candidates[0]
+                            if not candidates:
+                                break
                                 
-                                # Commit deduction transfers
-                                for name, value in winner["cost"].items():
-                                    loop_wallet[name] -= value
-                                    
-                                # Execute targeted state mutations
-                                if winner["type"] == "hero_lvl" or winner["type"] == "hero_ascend":
-                                    loop_state_profile[winner["troop"]][winner["slot"]]["lvl"] += 1
-                                elif winner["type"] == "hero_mastery":
-                                    loop_state_profile[winner["troop"]][winner["slot"]]["mastery"] += 1
-
-                                cost_string = ", ".join([f"{v:,.0f}x {k}" for k, v in winner["cost"].items()])
-                                current_roadmap.append({
-                                    "Execution Order": f"Step #{iteration}",
-                                    "Target Upgrade Recommended": winner["label"],
-                                    "Resource Allocation Required": cost_string,
-                                    "Combat Yield Multiplier Δ": f"+{winner['saved']:.1f} Surviving Troops"
-                                })
+                            candidates.sort(key=lambda x: x["efficiency"], reverse=True)
+                            winner = candidates[0]
                             
-                            final_timeline_survival = run_isolated_simulation(loop_state_profile)
-                            if final_timeline_survival > best_final_survival:
-                                best_final_survival = final_timeline_survival
-                                best_overall_roadmap = current_roadmap
-                                best_wallet_remainder = loop_wallet
+                            # Commit deduction transfers AND track costs per item
+                            for name, value in winner["cost"].items():
+                                loop_wallet[name] -= value
+                                piece_costs[winner["troop"]][winner["slot"]][name] = piece_costs[winner["troop"]][winner["slot"]].get(name, 0) + value
+                                
+                            # Execute targeted state mutations
+                            if winner["type"] == "hero_lvl" or winner["type"] == "hero_ascend":
+                                loop_state_profile[winner["troop"]][winner["slot"]]["lvl"] += 1
+                            elif winner["type"] == "hero_mastery":
+                                loop_state_profile[winner["troop"]][winner["slot"]]["mastery"] += 1
 
-                        # Render outputs to the dashboard interface frames
+                            current_roadmap.append(winner)
+                        
+                        final_timeline_survival = run_isolated_simulation(loop_state_profile)
+                        if final_timeline_survival > best_final_survival:
+                            best_final_survival = final_timeline_survival
+                            best_overall_roadmap = current_roadmap
+                            best_wallet_remainder = loop_wallet
+                            best_final_profile = copy.deepcopy(loop_state_profile)
+                            best_piece_costs = copy.deepcopy(piece_costs)
+
+                    # Render outputs to the dashboard interface frames
                     if best_overall_roadmap:
-                            st.success("🎯 Multi-Budget Execution Roadmap Compiled Successfully!")
-                            if monotonicity_guard and budget_multipliers[0] < 1.0:
-                                st.info("🛡️ **Monotonicity Guard Active:** Verified sub-budgets to guarantee pathing accuracy.")
-                                
-                            st.subheader("📋 Chronological Upgrade Action Blueprint")
-                            st.dataframe(pd.DataFrame(best_overall_roadmap), hide_index=True, use_container_width=True)
+                        st.success("🎯 Multi-Budget Execution Roadmap Compiled Successfully!")
+                        if monotonicity_guard and budget_multipliers[0] < 1.0:
+                            st.info("🛡️ **Monotonicity Guard Active:** Verified sub-budgets to guarantee pathing accuracy.")
                             
-                            st.markdown("#### 👛 Remaining Asset Reserves After Processing")
-                            rem_col1, rem_col2, rem_col3, rem_col4 = st.columns(4)
-                            rem_col1.metric("Remaining XP Pool", f"{best_wallet_remainder['XP']:,.0f}")
-                            rem_col2.metric("Remaining Forgehammers", f"{best_wallet_remainder['Forgehammer']:,.0f}")
-                            rem_col3.metric("Remaining Mithril Blocks", f"{best_wallet_remainder['Mithril']:,.0f}")
-                            rem_col4.metric("Remaining Mythic Pieces", f"{best_wallet_remainder['Mythic Piece']:,.0f}")
+                        # --- CONSTRUCT GROUPED OUTPUT TABLE ---
+                        grouped_data = []
+                        stat_type_map = {"Helm": "Lethality", "Gloves": "Health", "Chest": "Health", "Boots": "Lethality"}
+                        
+                        for troop in ["infantry", "cavalry", "archer"]:
+                            for slot in ["Helm", "Gloves", "Chest", "Boots"]:
+                                old_state = current_profile[troop][slot]
+                                new_state = best_final_profile[troop][slot]
+                                
+                                if old_state != new_state: # Something changed on this specific piece
+                                    lvl_change = f"{old_state['lvl']} ➔ {new_state['lvl']}" if old_state['lvl'] != new_state['lvl'] else "—"
+                                    mast_change = f"{old_state['mastery']} ➔ {new_state['mastery']}" if old_state['mastery'] != new_state['mastery'] else "—"
+                                    tier_change = f"{old_state['tier']} ➔ {new_state['tier']}" if old_state['tier'] != new_state['tier'] else "—"
+                                    
+                                    # Calculate Exact Stat Gain Delta
+                                    old_base = get_hero_gear_stat(old_state['tier'], old_state['lvl']) * 100.0
+                                    old_final = old_base * (1.0 + (old_state['mastery'] * 0.10))
+                                    
+                                    new_base = get_hero_gear_stat(new_state['tier'], new_state['lvl']) * 100.0
+                                    new_final = new_base * (1.0 + (new_state['mastery'] * 0.10))
+                                    
+                                    stat_gain = f"+{(new_final - old_final):.2f}%"
+                                    
+                                    # Format Cost String
+                                    costs = best_piece_costs[troop][slot]
+                                    cost_str = ", ".join([f"+{v:,.0f} {k}" for k, v in costs.items()])
+                                    
+                                    grouped_data.append({
+                                        "Gear Piece": f"{troop.capitalize()} {slot} ({stat_type_map[slot]})",
+                                        "Tier Change": tier_change,
+                                        "Level Change": lvl_change,
+                                        "Mastery Change": mast_change,
+                                        "Total Cost": cost_str,
+                                        "Stat Gain": stat_gain
+                                    })
+
+                        st.subheader("📋 Consolidated Gear Upgrade Plan")
+                        st.dataframe(pd.DataFrame(grouped_data), hide_index=True, use_container_width=True)
+                        
+                        st.markdown("#### 👛 Remaining Asset Reserves After Processing")
+                        rem_col1, rem_col2, rem_col3, rem_col4 = st.columns(4)
+                        rem_col1.metric("Remaining XP Pool", f"{best_wallet_remainder['XP']:,.0f}")
+                        rem_col2.metric("Remaining Forgehammers", f"{best_wallet_remainder['Forgehammer']:,.0f}")
+                        rem_col3.metric("Remaining Mithril Blocks", f"{best_wallet_remainder['Mithril']:,.0f}")
+                        rem_col4.metric("Remaining Mythic Pieces", f"{best_wallet_remainder['Mythic Piece']:,.0f}")
                     else:
-                            st.error("❌ The algorithm was unable to process an upgrade link. Verify your input balances.")
+                        st.error("❌ The algorithm was unable to process an upgrade link. Verify your input balances.")
