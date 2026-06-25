@@ -1349,13 +1349,34 @@ else:
                             
                     return total_surviving_target / mc_precision
 
-                # --- MULTI-BUDGET LOGIC TETHERING ---
+# --- MULTI-BUDGET LOGIC TETHERING ---
                 budget_multipliers = [1.0, 0.90, 0.80] if monotonicity_guard else [1.0]
                 best_overall_roadmap = []
                 best_final_survival = -1
                 best_wallet_remainder = {}
                 best_final_profile = {}
                 best_piece_costs = {}
+
+                # Capture absolute maximums for Percentage Normalization
+                max_budget = {
+                    "XP": max(1, calculated_xp_pool), 
+                    "Forgehammer": max(1, inv_hammers), 
+                    "Mithril": max(1, inv_mithril), 
+                    "Mythic Piece": max(1, inv_mythic_pieces)
+                }
+                
+                def calculate_normalized_efficiency(saved_troops, cost_dict, is_red_gear=False):
+                    """Calculates value based on the % of total budget used, applying a 10x penalty to irreversible resources."""
+                    budget_used_pct = 0.0
+                    for item, amount in cost_dict.items():
+                        pct = amount / max_budget[item]
+                        # Apply 10x penalty to irreversible resources (Hammers, Mithril, Pieces, or Red XP)
+                        if item in ["Forgehammer", "Mithril", "Mythic Piece"] or (item == "XP" and is_red_gear):
+                            pct *= 10.0
+                        budget_used_pct += pct
+                    
+                    pct_used = max(0.0001, budget_used_pct * 100.0)
+                    return saved_troops / pct_used
 
                 # Calculate total steps for the progress bar
                 total_ops = len(budget_multipliers) * 15
@@ -1392,26 +1413,28 @@ else:
                                             if current_lvl == 100 and current_tier == "Mythic":
                                                 test_profile[troop][slot]["tier"] = "Red"
                                                 
-                                            test_surv = run_isolated_simulation(test_profile)
-                                            saved = max(0.001, test_surv - control_surv)
-                                            eff = saved / max(1, (req_mithril * 50) + (req_mythic_pieces * 500))
-                                            candidates.append({
-                                                "type": "hero_ascend", "troop": troop, "slot": slot, "label": f"🔺 Ascend {troop.capitalize()} {slot} past Lvl {current_lvl} gate",
-                                                "cost": {"Mithril": req_mithril, "Mythic Piece": req_mythic_pieces}, "efficiency": eff, "saved": saved
-                                            })
+                                                test_surv = run_isolated_simulation(test_profile)
+                                                saved = max(0.001, test_surv - control_surv)
+                                                costs = {"Mithril": req_mithril, "Mythic Piece": req_mythic_pieces}
+                                                eff = calculate_normalized_efficiency(saved, costs, is_red_gear=True)
+                                                candidates.append({
+                                                    "type": "hero_ascend", "troop": troop, "slot": slot, "label": f"🔺 Ascend {troop.capitalize()} {slot} past Lvl {current_lvl} gate",
+                                                    "cost": costs, "efficiency": eff, "saved": saved
+                                                })
                                 else:
                                     # Regular incremental level processing loop
                                     req_xp = calculate_hero_gear_xp_cost(current_lvl)
                                     if loop_wallet["XP"] >= req_xp and current_lvl < 200:
-                                        test_profile = copy.deepcopy(loop_state_profile)
-                                        test_profile[troop][slot]["lvl"] += 1
-                                        test_surv = run_isolated_simulation(test_profile)
-                                        saved = max(0.001, test_surv - control_surv)
-                                        eff = saved / max(1, req_xp * 0.1)
-                                        candidates.append({
-                                            "type": "hero_lvl", "troop": troop, "slot": slot, "label": f"Enhance {troop.capitalize()} {slot} to Lvl {current_lvl + 1} ({current_tier})",
-                                            "cost": {"XP": req_xp}, "efficiency": eff, "saved": saved
-                                        })
+                                            test_profile = copy.deepcopy(loop_state_profile)
+                                            test_profile[troop][slot]["lvl"] += 1
+                                            test_surv = run_isolated_simulation(test_profile)
+                                            saved = max(0.001, test_surv - control_surv)
+                                            costs = {"XP": req_xp}
+                                            eff = calculate_normalized_efficiency(saved, costs, is_red_gear=(current_lvl >= 100))
+                                            candidates.append({
+                                                "type": "hero_lvl", "troop": troop, "slot": slot, "label": f"Enhance {troop.capitalize()} {slot} to Lvl {current_lvl + 1} ({current_tier})",
+                                                "cost": costs, "efficiency": eff, "saved": saved
+                                            })
 
                         # --- SCAN MASTERY FORGE STEPS ---
                         for troop in ["infantry", "cavalry", "archer"]:
@@ -1422,15 +1445,16 @@ else:
                                     req_pieces = max(0, current_mastery - 9)
                                     
                                     if loop_wallet["Forgehammer"] >= req_hammers and loop_wallet["Mythic Piece"] >= req_pieces:
-                                        test_profile = copy.deepcopy(loop_state_profile)
-                                        test_profile[troop][slot]["mastery"] += 1
-                                        test_surv = run_isolated_simulation(test_profile)
-                                        saved = max(0.001, test_surv - control_surv)
-                                        eff = saved / max(1, req_hammers + (req_pieces * 500))
-                                        candidates.append({
-                                            "type": "hero_mastery", "troop": troop, "slot": slot, "label": f"⭐ Mastery Forge {troop.capitalize()} {slot} to Star Lvl {current_mastery + 1}",
-                                            "cost": {"Forgehammer": req_hammers, "Mythic Piece": req_pieces}, "efficiency": eff, "saved": saved
-                                        })
+                                            test_profile = copy.deepcopy(loop_state_profile)
+                                            test_profile[troop][slot]["mastery"] += 1
+                                            test_surv = run_isolated_simulation(test_profile)
+                                            saved = max(0.001, test_surv - control_surv)
+                                            costs = {"Forgehammer": req_hammers, "Mythic Piece": req_pieces}
+                                            eff = calculate_normalized_efficiency(saved, costs)
+                                            candidates.append({
+                                                "type": "hero_mastery", "troop": troop, "slot": slot, "label": f"⭐ Mastery Forge {troop.capitalize()} {slot} to Star Lvl {current_mastery + 1}",
+                                                "cost": costs, "efficiency": eff, "saved": saved
+                                            })
 
                         # Increment Progress Bar
                         ops_completed += 1
