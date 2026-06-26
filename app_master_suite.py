@@ -347,7 +347,7 @@ else:
     # --- MASTER HEADERS & SYSTEM DESCRIPTIONS ---
     # =========================================================================
     with st.expander(" Module Descriptions", expanded=False):
-        col_desc1, col_desc2, col_desc3, col_desc4 = st.columns(4)
+        col_desc1, col_desc2, col_desc3, col_desc4,col_desc5 = st.columns(4)
         with col_desc1:
             st.markdown("### Multi-Rally Simulator")
             st.write("Simulate consecutive rally waves hitting a fixed structure. Evaluates sequential attrition, troop depletion curves, and step-by-step win conditions.")
@@ -361,6 +361,11 @@ else:
             st.markdown("### Hero Gear Optimizer Engine")
             st.write("Input Hero Gear as well as upgrade material decide if you want to optimize your defense or attack. Input current stats and for your desired opponent. The optimizer then uses..." \
             "a greedy algorithm to determine which upgrade paths provide the best performance against the opponent ")
+        with col_desc5:
+            st.markdown("### Charm Optimizer Engine")
+            st.write("Input Charms as well as upgrade material decide if you want to optimize your defense or attack. Input current stats and for your desired opponent. The optimizer then uses..." \
+            "a greedy algorithm to determine which upgrade paths provide the best performance against the opponent ")
+
 
 # Replace your old tab layout row with this four-tab tuple:
     tab_sim, tab_opt, tab_roi, tab_gear = st.tabs([
