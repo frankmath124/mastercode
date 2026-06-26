@@ -138,14 +138,12 @@ def export_army_to_json(prefix, is_wave=False, wave_idx=0):
 
 def load_charm_cost_atlas():
     """
-    Returns lists mapped exactly to Charm levels 1 through 22.
-    Index 0 corresponds to Level 1 -> 2 upgrade costs/stats.
+    Returns lists mapped exactly to Charm target levels 1 through 22.
+    Index 0 is a placeholder so that index 1 = Level 1 costs, index 22 = Level 22 costs.
     """
-    # Charm levels 1 to 22 scaling arrays
-    charm_guides = [5, 10, 15, 20, 25, 30, 40, 50, 60, 70, 80, 100, 120, 140, 160, 180, 200, 250, 300, 350, 400]
-    charm_designs = [1, 2, 3, 4, 5, 6, 8, 10, 12, 14, 16, 20, 24, 28, 32, 36, 40, 50, 60, 70, 80]
-    # Each level adds a flat stat increment to both Lethality and Health %
-    stat_deltas = [0.5, 0.5, 0.5, 0.75, 0.75, 0.75, 1.0, 1.0, 1.0, 1.25, 1.25, 1.25, 1.5, 1.5, 1.5, 1.75, 1.75, 1.75, 2.0, 2.0, 2.0]
+    charm_guides =  [0, 5, 40, 60, 80, 100, 120, 140, 200, 300, 420, 560, 580, 610, 645, 685, 730, 780, 835, 895, 960, 1030, 1105]
+    charm_designs = [0, 5, 15, 40, 100, 200, 300, 400, 400, 400, 420, 420, 600, 780, 960, 1140, 1320, 1500, 1680, 1860, 2040, 2220, 2400]
+    stat_deltas =   [0.0, 9.0, 3.0, 4.0, 3.0, 6.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 4.0, 4.0, 4.0, 4.0, 4.0, 4.0, 4.0, 4.0, 4.0, 4.0, 4.0]
     
     return {"guides": charm_guides, "designs": charm_designs, "deltas": stat_deltas}
 
@@ -1596,7 +1594,7 @@ else:
             max_actions = st.number_input("Max Upgrades to Map", min_value=1, max_value=30, value=10, step=1)
 
         with c_main:
-            st.markdown("### 🔮 Current Charm Levels (1 - 22)")
+            st.markdown("### 🔮 Current Charm Levels (0 - 22)")
             
             # Group Charms logically into 3 Troop columns
             ch_col1, ch_col2, ch_col3 = st.columns(3)
@@ -1606,19 +1604,20 @@ else:
             with ch_col1:
                 st.markdown("#### 🛡️ Infantry Charms")
                 for i in range(6):
-                    lvl = st.number_input(f"Infantry Slot #{i+1}", min_value=1, max_value=22, value=5, step=1, key=f"ch_inf_{i}")
+                    # Changed min_value to 0 to support un-forged empty slots
+                    lvl = st.number_input(f"Infantry Slot #{i+1}", min_value=0, max_value=22, value=5, step=1, key=f"ch_inf_{i}")
                     current_charms["infantry"].append(lvl)
                     
             with ch_col2:
                 st.markdown("#### 🏇 Cavalry Charms")
                 for i in range(6):
-                    lvl = st.number_input(f"Cavalry Slot #{i+1}", min_value=1, max_value=22, value=4, step=1, key=f"ch_cav_{i}")
+                    lvl = st.number_input(f"Cavalry Slot #{i+1}", min_value=0, max_value=22, value=4, step=1, key=f"ch_cav_{i}")
                     current_charms["cavalry"].append(lvl)
                     
             with ch_col3:
                 st.markdown("#### 🏹 Archer Charms")
                 for i in range(6):
-                    lvl = st.number_input(f"Archer Slot #{i+1}", min_value=1, max_value=22, value=4, step=1, key=f"ch_arc_{i}")
+                    lvl = st.number_input(f"Archer Slot #{i+1}", min_value=0, max_value=22, value=4, step=1, key=f"ch_arc_{i}")
                     current_charms["archer"].append(lvl)
 
             st.markdown("---")
@@ -1656,9 +1655,8 @@ else:
                     for r, troop in enumerate(["infantry", "cavalry", "archer"]):
                         total_stat_pct = 0.0
                         for lvl in charm_state[troop]:
-                            # Sum up historical stat increments for this specific charm level state
-                            if lvl > 1:
-                                total_stat_pct += sum(charm_atlas["deltas"][:lvl-1])
+                            # Slice sums up all cumulative stats up to the current level
+                            total_stat_pct += sum(charm_atlas["deltas"][:lvl+1])
                         
                         # Charms uniformly increase both Lethality (Col 2) and Health (Col 3)
                         target_matrix[r, 2] += total_stat_pct
@@ -1678,7 +1676,7 @@ else:
                     return total_surviving_target / ch_precision
 
                 # -------------------------------------------------------------------------
-                # --- GREedy SEARCH LOOP WITH SQUARED SCARCITY SCORING ---
+                # --- GREEDY SEARCH LOOP WITH SQUARED SCARCITY SCORING ---
                 # -------------------------------------------------------------------------
                 for action_step in range(1, max_actions + 1):
                     ch_status.markdown(f"**🔍 Calculating Optimal Charm Progression Step #{action_step}...**")
@@ -1698,9 +1696,9 @@ else:
                             if current_lvl >= 22:
                                 continue # Max level cap boundary reached
                                 
-                            idx = current_lvl - 1 # Array mapping offset
-                            req_g = charm_atlas["guides"][idx]
-                            req_d = charm_atlas["designs"][idx]
+                            target_lvl = current_lvl + 1
+                            req_g = charm_atlas["guides"][target_lvl]
+                            req_d = charm_atlas["designs"][target_lvl]
                             
                             if ch_wallet["Guides"] >= req_g and ch_wallet["Designs"] >= req_d:
                                 # Clone profile and nudge slot
@@ -1715,7 +1713,7 @@ else:
                                 efficiency = troops_saved / max(1e-9, resource_score)
                                 
                                 candidates.append({
-                                    "troop": troop, "slot": slot_idx, "next_lvl": current_lvl + 1,
+                                    "troop": troop, "slot": slot_idx, "next_lvl": target_lvl,
                                     "cost_g": req_g, "cost_d": req_d, "efficiency": efficiency, "saved": troops_saved
                                 })
 
@@ -1735,7 +1733,7 @@ else:
                     running_charms[winner["troop"]][winner["slot"]] += 1
                     
                     # Accumulate tracking arrays for consolidated output mapping
-                    lvl_idx = winner["next_lvl"] - 2
+                    lvl_idx = winner["next_lvl"]
                     stat_gain_amt = charm_atlas["deltas"][lvl_idx]
                     
                     accumulated_gains[winner["troop"]][winner["slot"]] += stat_gain_amt
@@ -1766,7 +1764,7 @@ else:
                                 stat_gain = accumulated_gains[troop][slot_idx]
                                 
                                 consolidated_rows.append({
-                                    "Charm Piece Target": f"{troop.upper()} Charm Slot #{slot_idx + 1}",
+                                    "Charm Piece Target": f"{troop.capitalize()} Charm Slot #{slot_idx + 1}",
                                     "Level Transition": f"Level {start_l} ➔ {end_l}",
                                     "Total Resource Allocation Required": cost_display,
                                     "Stat Gain Yield (Lethality & HP)": f"+{stat_gain:.2f}%"
