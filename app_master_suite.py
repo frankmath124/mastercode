@@ -391,13 +391,14 @@ else:
             "a greedy algorithm to determine which upgrade paths provide the best performance against the opponent ****uses the hero gear battle stats so update that ")
 
 # Replace your old tab layout row with this four-tab tuple:
-    tab_sim, tab_opt, tab_roi, tab_gear, tab_charms, tab_gov = st.tabs([
+    tab_sim, tab_opt, tab_roi, tab_gear, tab_charms, tab_gov, tab_manual = st.tabs([
         "Multi-Rally Simulator", 
         "Battle Optimizer", 
         "Stat Improvement Optimizer", 
         "Hero Gear Optimizer",
         "Charm Optimizer",
-        "Governor Gear Optimizer"
+        "Governor Gear Optimizer",
+        "User Manual"
     ])
 
     # =========================================================================
@@ -2063,3 +2064,68 @@ else:
                     r_g3.metric("Remaining Artisan's Vision", f"{gv_wallet['Vision']:,}")
                 else:
                     st.error("❌ The algorithm was unable to calculate an upgrade link. Verify your input balances.")
+
+
+                        # --- TAB 7- Manual ---
+    # =========================================================================
+    with tab_manual:
+        st.header("User Manual")
+        st.caption("Quick user manual")
+        st.markdown("FRANK-Optimizer: Master Suite User Manual " \
+        "Welcome to the FRANK-Optimizer. This suite is a high-performance combat logistics engine. Unlike standard calculators, this suite uses direct Monte Carlo simulation physics, meaning your results are derived from thousands of virtual battles, not just static stat weights." \
+        "📸 The Dual-Column OCR Scanner" \
+        "Populate your data automatically from battle reports." \
+        "How to use: Upload a screenshot of your report. The scanner maps the Left and Right sides of your report to specific UI slots."
+        "Important Limitation: The OCR Scanner currently only maps data to the Multi-Rally Simulator and Tactical Optimizer tabs. It does not auto-populate inventory counts for the Gear, Charm, or Governor Gear optimizers." \
+        "⚙️ Engine Mechanics: Monte Carlo Iterations" \
+        "Because Kingshot combat involves random variables (e.g., skill proc chances, dodge chances), a single simulation is just one lucky or unlucky roll of the dice. We use Monte Carlo iterations to roll those dice hundreds of times to find the average outcome." \
+        "Scaling Guide: Precision vs. Speed" \
+        "Iterations	Precision	Speed	Best For..." \
+        "10 - 30	Rough	Instant	Napkin Math: Quick testing to see if an idea is even worth pursuing."
+        "40 - 60	Balanced	Fast	Gear/Charm Optimizers: Perfect for grid searching across many slots."
+        "100 - 200	High	Moderate	Simulator: Final verification of a rally setup before a big event."
+        "500+	Scientific	Slow	Ultimate Precision: Use only when narrowing down final 2-3 choices."
+        ""
+        "Law of Convergence: Once you pass 200 iterations, the average result barely changes. The difference in accuracy between 500 and 1,000 iterations is usually less than 0.1%, but the wait time doubles."
+        ""
+        "🧠 Optimization Modules"
+        "1. Multi-Rally Simulator (The Attrition Engine)"
+        ""
+        "Models sequential wave-on-wave combat. Troops lost in Wave 1 are permanently gone for Wave 2. Always define your Garrison first, then configure your incoming Wave configurations."
+        "2. Tactical Optimizer (The Grid Search)"
+        ""
+        "Brute-forces solutions for troop ratios or supporter hero sets. It tests every valid combination and aims to maximize surviving troop counts."
+        "3. Stat Improvement Optimizer (ROI Engine)"
+        "Identifies which stat nodes provide the best bang for your buck by adding a nudge to your current stats and re-running the simulation."
+        "4, 5, & 6. Gear, Charm, & Gov Gear Optimizers"
+        ""
+        "These modules handle your surgical upgrades."
+        ""
+        ""
+        "Squared Scarcity Logic: If you have 5,000 Guides but only 500 Designs, the Designs cost is weighted exponentially higher. The optimizer will prioritize upgrades that save your bottleneck resources."
+        ""
+        "Irreversible Resources: The optimizer applies a 10x penalty to resources that cannot be refunded (Forgehammers, Mithril, Mythic Pieces, Red Gear XP). It will not suggest burning these assets unless the combat payout is massive."
+        ""
+        " Power-User Tips (The FRANK Rules)"
+        ""
+        "1. The Terror Set Widget Rule"
+        "If you are currently running a Terror Set, you must set your widget levels to 0 in the optimizer."
+        ""
+        " Why? The engine adds stat bonuses for widgets automatically. If you leave them at 10+, the engine will falsely add stats that aren't actually occurring."
+        ""
+        "2. Sequential vs. Global Strategy"
+        ""
+        ""
+        "Sequential: Calculates the best next step. Use this if you are upgrading piece-by-piece today."
+        ""
+        ""
+        "Global (Optimizer Mode): Looks 10-15 steps into the future. It may suggest a bad upgrade for Step #1 because it knows it unlocks a God-tier milestone at Step #2. Always trust Global Mode for long-term planning."
+        ""
+        "3. Understanding Combat ROI"
+        ""
+        "The engine optimizes for Combat Survivability per Resource Unit."
+        "If upgrading an Infantry Chest saves 4,500 troops, and upgrading a Cavalry Helm saves 4,800 troops, the engine chooses the Helm. It ignores arbitrary weights because it can see the battle outcome—if the frontline collapses, your archers die, regardless of how much attack power they have. The simulator discovers these synergies automatically"
+        ""
+        "4. Manual Overrides"
+        ""
+        "If the OCR misses a line, you can always manually override the stats in the UI. The optimizer will prioritize your manual input over the scanned data.")
