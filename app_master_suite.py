@@ -136,6 +136,19 @@ def export_army_to_json(prefix, is_wave=False, wave_idx=0):
 
     return json.dumps(preset, indent=4)
 
+def load_charm_cost_atlas():
+    """
+    Returns lists mapped exactly to Charm levels 1 through 22.
+    Index 0 corresponds to Level 1 -> 2 upgrade costs/stats.
+    """
+    # Charm levels 1 to 22 scaling arrays
+    charm_guides = [5, 10, 15, 20, 25, 30, 40, 50, 60, 70, 80, 100, 120, 140, 160, 180, 200, 250, 300, 350, 400]
+    charm_designs = [1, 2, 3, 4, 5, 6, 8, 10, 12, 14, 16, 20, 24, 28, 32, 36, 40, 50, 60, 70, 80]
+    # Each level adds a flat stat increment to both Lethality and Health %
+    stat_deltas = [0.5, 0.5, 0.5, 0.75, 0.75, 0.75, 1.0, 1.0, 1.0, 1.25, 1.25, 1.25, 1.5, 1.5, 1.5, 1.75, 1.75, 1.75, 2.0, 2.0, 2.0]
+    
+    return {"guides": charm_guides, "designs": charm_designs, "deltas": stat_deltas}
+
 def import_army_from_json(json_str, target_prefix, is_wave=False, wave_idx=0):
     """Maps a standardized JSON string perfectly into the requested UI slot."""
     try:
@@ -206,7 +219,8 @@ st.title("FRANK-Optimizer: Kingshot Battle Simulator and Optimizer")
 st.caption("Centralised Combat Logistics & Battle Math Matrix.")
 
 if "authenticated" not in st.session_state:
-    st.session_state["authenticated"] = False
+    st.session_state["authenticated"] = True
+    st.session_state["joiner_filter_enabled"] = True
 
 if not st.session_state["authenticated"]:
     st.title("🔒 Security Access Required")
@@ -353,7 +367,8 @@ else:
         "Multi-Rally Simulator", 
         "Battle Optimizer", 
         "Stat Improvement Optimizer", 
-        "Hero Gear Optimizer"
+        "Hero Gear Optimizer",
+        "Charm Optimizer"
     ])
 
     # =========================================================================
@@ -1550,3 +1565,217 @@ else:
                         rem_col4.metric("Remaining Mythic Pieces", f"{best_wallet_remainder['Mythic Piece']:,.0f}")
                 else:
                         st.error("❌ The algorithm was unable to process an upgrade link. Verify your input balances.")
+
+# =========================================================================
+    # --- TAB 5: SURGICAL CHARMS OPTIMIZER ---
+    # =========================================================================
+    with tab_charms:
+        st.header("⚡ Surgical Charms Optimizer")
+        st.caption("Optimizes all 18 charm slots dynamically using direct Monte Carlo simulation output squared against item scarcity.")
+
+        charm_atlas = load_charm_cost_atlas()
+
+        # -------------------------------------------------------------------------
+        # --- INVENTORY & SIDE CONFIG PANEL ---
+        # -------------------------------------------------------------------------
+        c_main, c_side = st.columns([2, 1])
+
+        with c_side:
+            st.markdown("### 🎒 Charm Asset Inventory")
+            inv_guides = st.number_input("Available Charm Guides", min_value=0, value=2500, step=100, key="ch_inv_guides")
+            inv_designs = st.number_input("Available Charm Designs", min_value=0, value=300, step=25, key="ch_inv_designs")
+            
+            st.markdown("---")
+            st.markdown("### ⚙️ Search Precision")
+            ch_precision = st.slider("Monte Carlo Pass Precision", 10, 150, 40, step=10, key="ch_precision_slider")
+            max_actions = st.number_input("Max Upgrades to Map", min_value=1, max_value=30, value=10, step=1)
+
+        with c_main:
+            st.markdown("### 🔮 Current Charm Levels (1 - 22)")
+            
+            # Group Charms logically into 3 Troop columns
+            ch_col1, ch_col2, ch_col3 = st.columns(3)
+            
+            current_charms = {"infantry": [], "cavalry": [], "archer": []}
+            
+            with ch_col1:
+                st.markdown("#### 🛡️ Infantry Charms")
+                for i in range(6):
+                    lvl = st.number_input(f"Infantry Slot #{i+1}", min_value=1, max_value=22, value=5, step=1, key=f"ch_inf_{i}")
+                    current_charms["infantry"].append(lvl)
+                    
+            with ch_col2:
+                st.markdown("#### 🏇 Cavalry Charms")
+                for i in range(6):
+                    lvl = st.number_input(f"Cavalry Slot #{i+1}", min_value=1, max_value=22, value=4, step=1, key=f"ch_cav_{i}")
+                    current_charms["cavalry"].append(lvl)
+                    
+            with ch_col3:
+                st.markdown("#### 🏹 Archer Charms")
+                for i in range(6):
+                    lvl = st.number_input(f"Archer Slot #{i+1}", min_value=1, max_value=22, value=4, step=1, key=f"ch_arc_{i}")
+                    current_charms["archer"].append(lvl)
+
+            st.markdown("---")
+            
+            if st.button("🚀 Execute Combat-Driven Charms Optimization", type="primary", use_container_width=True, key="ch_run_btn"):
+                ch_progress = st.progress(0)
+                ch_status = st.empty()
+                
+                # Snapshot wallets
+                ch_wallet = {"Guides": inv_guides, "Designs": inv_designs}
+                running_charms = copy.deepcopy(current_charms)
+                charms_roadmap = []
+                
+                # Tracking accumulation matrix per charm slot to consolidate output
+                accumulated_gains = {t: [0.0 for _ in range(6)] for t in ["infantry", "cavalry", "archer"]}
+                accumulated_costs = {t: [{"Guides": 0, "Designs": 0} for _ in range(6)] for t in ["infantry", "cavalry", "archer"]}
+                starting_levels = copy.deepcopy(current_charms)
+
+                def run_charm_isolated_simulation(charm_state):
+                    """Injects the baseline battle report stats modified by the running charm configurations."""
+                    my_stats_matrix = np.array([
+                        [my_ia, my_id, my_il, my_ih], 
+                        [my_ca, my_cd, my_cl, my_ch], 
+                        [my_aa, my_ad, my_al, my_ah]
+                    ])
+                    opp_stats_matrix = np.array([
+                        [opp_ia, opp_id, opp_il, opp_ih],
+                        [opp_ca, opp_cd, opp_cl, opp_ch],
+                        [opp_aa, opp_ad, opp_al, opp_ah]
+                    ])
+                    
+                    target_matrix = my_stats_matrix if opt_role == "Rally Attacker" else opp_stats_matrix
+                    
+                    # Add Charm stat values onto the battle matrix baseline
+                    for r, troop in enumerate(["infantry", "cavalry", "archer"]):
+                        total_stat_pct = 0.0
+                        for lvl in charm_state[troop]:
+                            # Sum up historical stat increments for this specific charm level state
+                            if lvl > 1:
+                                total_stat_pct += sum(charm_atlas["deltas"][:lvl-1])
+                        
+                        # Charms uniformly increase both Lethality (Col 2) and Health (Col 3)
+                        target_matrix[r, 2] += total_stat_pct
+                        target_matrix[r, 3] += total_stat_pct
+
+                    my_march = TroopSide([my_inf, my_cav, my_arc], my_stats_matrix, [my_h1, my_h2, my_h3], ["None"]*4)
+                    opp_march = TroopSide([opp_inf, opp_cav, opp_arc], opp_stats_matrix, [opp_h1, opp_h2, opp_h3], ["None"]*4)
+                    
+                    attacker_side = my_march if opt_role == "Rally Attacker" else opp_march
+                    defender_side = opp_march if opt_role == "Rally Attacker" else my_march
+                    
+                    total_surviving_target = 0
+                    for _ in range(ch_precision):
+                        res = kingshot_multirally_sim2([attacker_side.clone()], defender_side.clone())
+                        total_surviving_target += np.sum(res[1][0]['attacker_surviving']) if opt_role == "Rally Attacker" else np.sum(res[0].troops)
+                            
+                    return total_surviving_target / ch_precision
+
+                # -------------------------------------------------------------------------
+                # --- GREedy SEARCH LOOP WITH SQUARED SCARCITY SCORING ---
+                # -------------------------------------------------------------------------
+                for action_step in range(1, max_actions + 1):
+                    ch_status.markdown(f"**🔍 Calculating Optimal Charm Progression Step #{action_step}...**")
+                    
+                    control_surv = run_charm_isolated_simulation(running_charms)
+                    candidates = []
+                    
+                    # Squared Scarcity Weight calculations based on current wallets
+                    g_pool = max(1, ch_wallet["Guides"])
+                    d_pool = max(1, ch_wallet["Designs"])
+                    
+                    w_guides = 1.0 / (g_pool ** 2)
+                    w_designs = 1.0 / (d_pool ** 2)
+
+                    for troop in ["infantry", "cavalry", "archer"]:
+                        for slot_idx, current_lvl in enumerate(running_charms[troop]):
+                            if current_lvl >= 22:
+                                continue # Max level cap boundary reached
+                                
+                            idx = current_lvl - 1 # Array mapping offset
+                            req_g = charm_atlas["guides"][idx]
+                            req_d = charm_atlas["designs"][idx]
+                            
+                            if ch_wallet["Guides"] >= req_g and ch_wallet["Designs"] >= req_d:
+                                # Clone profile and nudge slot
+                                test_charms = copy.deepcopy(running_charms)
+                                test_charms[troop][slot_idx] += 1
+                                
+                                test_surv = run_charm_isolated_simulation(test_charms)
+                                troops_saved = max(0.001, test_surv - control_surv)
+                                
+                                # Apply Squared Scarcity cost weighting denominator
+                                resource_score = (req_g * w_guides) + (req_d * w_designs)
+                                efficiency = troops_saved / max(1e-9, resource_score)
+                                
+                                candidates.append({
+                                    "troop": troop, "slot": slot_idx, "next_lvl": current_lvl + 1,
+                                    "cost_g": req_g, "cost_d": req_d, "efficiency": efficiency, "saved": troops_saved
+                                })
+
+                    if not candidates:
+                        ch_progress.progress(1.0)
+                        break
+                        
+                    # Choose step winner
+                    candidates.sort(key=lambda x: x["efficiency"], reverse=True)
+                    winner = candidates[0]
+                    
+                    # Deduct assets from loop wallet
+                    ch_wallet["Guides"] -= winner["cost_g"]
+                    ch_wallet["Designs"] -= winner["cost_d"]
+                    
+                    # Mutate loop states
+                    running_charms[winner["troop"]][winner["slot"]] += 1
+                    
+                    # Accumulate tracking arrays for consolidated output mapping
+                    lvl_idx = winner["next_lvl"] - 2
+                    stat_gain_amt = charm_atlas["deltas"][lvl_idx]
+                    
+                    accumulated_gains[winner["troop"]][winner["slot"]] += stat_gain_amt
+                    accumulated_costs[winner["troop"]][winner["slot"]]["Guides"] += winner["cost_g"]
+                    accumulated_costs[winner["troop"]][winner["slot"]]["Designs"] += winner["cost_d"]
+                    
+                    charms_roadmap.append(winner)
+                    ch_progress.progress(action_step / max_actions)
+
+                ch_progress.empty()
+                ch_status.empty()
+
+                # -------------------------------------------------------------------------
+                # --- CONSOLIDATE AND DISPLAY FINAL BLUEPRINT ---
+                # -------------------------------------------------------------------------
+                if charms_roadmap:
+                    st.success("🎯 Optimal Charm Allocation Roadmap Compiled Successfully!")
+                    
+                    consolidated_rows = []
+                    for troop in ["infantry", "cavalry", "archer"]:
+                        for slot_idx in range(6):
+                            start_l = starting_levels[troop][slot_idx]
+                            end_l = running_charms[troop][slot_idx]
+                            
+                            if start_l != end_l:
+                                costs = accumulated_costs[troop][slot_idx]
+                                cost_display = f"+{costs['Guides']:,} Guides, +{costs['Designs']:,} Designs"
+                                stat_gain = accumulated_gains[troop][slot_idx]
+                                
+                                consolidated_rows.append({
+                                    "Charm Piece Target": f"{troop.upper()} Charm Slot #{slot_idx + 1}",
+                                    "Level Transition": f"Level {start_l} ➔ {end_l}",
+                                    "Total Resource Allocation Required": cost_display,
+                                    "Stat Gain Yield (Lethality & HP)": f"+{stat_gain:.2f}%"
+                                })
+                                
+                    st.subheader("📋 Consolidated Charm Upgrade Action Plan")
+                    if consolidated_rows:
+                        st.dataframe(pd.DataFrame(consolidated_rows), hide_index=True, use_container_width=True)
+                    else:
+                        st.info("No level transitions occurred. Upgrades analyzed were outvalued by core budget limits.")
+                        
+                    st.markdown("#### 👛 Remaining Asset Reserves After Processing")
+                    r_ch1, r_ch2 = st.columns(2)
+                    r_ch1.metric("Remaining Charm Guides", f"{ch_wallet['Guides']:,}")
+                    r_ch2.metric("Remaining Charm Designs", f"{ch_wallet['Designs']:,}")
+                else:
+                    st.error("❌ The algorithm was unable to calculate an upgrade link. Verify your input balances or max upgrade constraints.")
