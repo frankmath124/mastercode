@@ -368,7 +368,7 @@ else:
 
 
 # Replace your old tab layout row with this four-tab tuple:
-    tab_sim, tab_opt, tab_roi, tab_gear = st.tabs([
+    tab_sim, tab_opt, tab_roi, tab_gear, tab_charms = st.tabs([
         "Multi-Rally Simulator", 
         "Battle Optimizer", 
         "Stat Improvement Optimizer", 
