@@ -347,7 +347,7 @@ else:
     # --- MASTER HEADERS & SYSTEM DESCRIPTIONS ---
     # =========================================================================
     with st.expander(" Module Descriptions", expanded=False):
-        col_desc1, col_desc2, col_desc3, col_desc4,col_desc5 = st.columns(4)
+        col_desc1, col_desc2, col_desc3, col_desc4,col_desc5 = st.columns(5)
         with col_desc1:
             st.markdown("### Multi-Rally Simulator")
             st.write("Simulate consecutive rally waves hitting a fixed structure. Evaluates sequential attrition, troop depletion curves, and step-by-step win conditions.")
