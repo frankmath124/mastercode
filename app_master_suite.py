@@ -136,6 +136,28 @@ def export_army_to_json(prefix, is_wave=False, wave_idx=0):
 
     return json.dumps(preset, indent=4)
 
+def load_governor_gear_atlas():
+    """
+    Index 0 is 'None'. 
+    Index 1 corresponds to 'Green 0★', Index 58 corresponds to 'Red T6 3★'.
+    """
+    gov_tier_names = ["None", "Green 0★", "Green 1★", "Blue 0★", "Blue 1★", "Blue 2★", "Blue 3★", "Purple 0★", "Purple 1★", "Purple 2★", "Purple 3★", "Purple T1 0★", "Purple T1 1★", "Purple T1 2★", "Purple T1 3★", "Gold 0★", "Gold 1★", "Gold 2★", "Gold 3★", "Gold T1 0★", "Gold T1 1★", "Gold T1 2★", "Gold T1 3★", "Gold T2 0★", "Gold T2 1★", "Gold T2 2★", "Gold T2 3★", "Gold T3 0★", "Gold T3 1★", "Gold T3 2★", "Gold T3 3★", "Red 0★", "Red 1★", "Red 2★", "Red 3★", "Red T1 0★", "Red T1 1★", "Red T1 2★", "Red T1 3★", "Red T2 0★", "Red T2 1★", "Red T2 2★", "Red T2 3★", "Red T3 0★", "Red T3 1★", "Red T3 2★", "Red T3 3★", "Red T4 0★", "Red T4 1★", "Red T4 2★", "Red T4 3★", "Red T5 0★", "Red T5 1★", "Red T5 2★", "Red T5 3★", "Red T6 0★", "Red T6 1★", "Red T6 2★", "Red T6 3★"]
+
+    gov_costs_satin = [0, 1500, 3800, 7000, 9700, 1000, 1000, 1500, 1500, 6500, 8000, 10000, 11000, 13000, 15000, 22000, 23000, 25000, 26000, 28000, 30000, 32000, 35000, 38000, 43000, 45000, 48000, 60000, 70000, 80000, 90000, 108000, 114000, 121000, 128000, 154000, 163000, 173000, 183000, 220000, 233000, 247000, 264000, 288000, 302000, 317000, 333000, 358000, 384000, 403000, 423000, 451000, 479000, 507000, 535000, 548000, 565000, 582000, 599000]
+
+    gov_costs_threads = [0, 15, 40, 70, 95, 10, 10, 15, 15, 65, 80, 95, 110, 130, 160, 220, 230, 250, 260, 280, 300, 320, 340, 360, 430, 460, 500, 600, 700, 800, 900, 1080, 1140, 1210, 1280, 1540, 1630, 1730, 1830, 2200, 2330, 2470, 2640, 2880, 3020, 3170, 3330, 3580, 3840, 4030, 4230, 4510, 4790, 5070, 5350, 5480, 5650, 5820, 5990]
+
+    gov_costs_vision = [0, 0, 0, 0, 0, 45, 50, 60, 70, 40, 50, 60, 70, 85, 100, 40, 40, 45, 45, 45, 55, 55, 55, 55, 75, 80, 85, 120, 140, 160, 180, 220, 230, 240, 250, 300, 320, 340, 360, 430, 460, 490, 520, 570, 600, 630, 660, 720, 770, 810, 850, 910, 970, 1030, 1090, 1110, 1140, 1170, 1210]
+
+    gov_stat_deltas = [0.0, 9.35, 3.40, 4.25, 4.25, 4.25, 4.25, 4.25, 2.89, 2.89, 2.89, 2.89, 2.89, 2.89, 2.89, 2.55, 2.55, 2.55, 2.55, 2.55, 2.55, 2.55, 2.55, 2.55, 2.55, 2.55, 2.55, 2.55, 2.55, 2.55, 2.50, 2.50, 2.50, 2.50, 2.50, 2.50, 2.50, 2.50, 2.50, 2.50, 2.50, 2.50, 2.50, 2.75, 2.75, 2.75, 2.75, 2.75, 2.75, 2.75, 2.75, 3.00, 3.00, 3.00, 3.00, 3.00, 3.00, 3.00, 3.00]
+
+    gov_set_bonuses = [0.0, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0, 5.0, 5.0, 5.0, 6.0, 6.0, 6.0, 6.0, 7.0, 7.0, 7.0, 7.0, 8.0, 8.0, 8.0, 8.0, 9.0, 9.0, 9.0, 9.0, 10.0, 10.0, 10.0, 10.0, 12.0, 12.0, 12.0, 12.0, 14.0, 14.0, 14.0, 14.0, 16.5, 16.5, 16.5, 16.5, 19.5, 19.5, 19.5, 19.5, 23.0, 23.0, 23.0, 23.0, 26.5, 26.5, 26.5, 26.5, 30.0, 30.0, 30.0, 30.0]
+    
+    return {
+        "names": gov_tier_names, "satin": gov_costs_satin, "threads": gov_costs_threads, 
+        "vision": gov_costs_vision, "deltas": gov_stat_deltas, "set_bonuses": gov_set_bonuses
+    }
+
 def load_charm_cost_atlas():
     """
     Returns lists mapped exactly to Charm target levels 1 through 22.
@@ -345,7 +367,7 @@ else:
     # --- MASTER HEADERS & SYSTEM DESCRIPTIONS ---
     # =========================================================================
     with st.expander(" Module Descriptions", expanded=False):
-        col_desc1, col_desc2, col_desc3, col_desc4,col_desc5 = st.columns(5)
+        col_desc1, col_desc2, col_desc3, col_desc4,col_desc5, col_desc6 = st.columns(6)
         with col_desc1:
             st.markdown("### Multi-Rally Simulator")
             st.write("Simulate consecutive rally waves hitting a fixed structure. Evaluates sequential attrition, troop depletion curves, and step-by-step win conditions.")
@@ -362,16 +384,20 @@ else:
         with col_desc5:
             st.markdown("### Charm Optimizer Engine")
             st.write("Input Charms as well as upgrade material decide if you want to optimize your defense or attack. Input current stats and for your desired opponent. The optimizer then uses..." \
-            "a greedy algorithm to determine which upgrade paths provide the best performance against the opponent ")
-
+            "a greedy algorithm to determine which upgrade paths provide the best performance against the opponent ****uses the hero gear battle stats so update that ")
+        with col_desc6:
+            st.markdown("### Governor Gear Optimizer Engine")
+            st.write("Input Governor gear as well as upgrade material decide if you want to optimize your defense or attack. Input current stats and for your desired opponent. The optimizer then uses..." \
+            "a greedy algorithm to determine which upgrade paths provide the best performance against the opponent ****uses the hero gear battle stats so update that ")
 
 # Replace your old tab layout row with this four-tab tuple:
-    tab_sim, tab_opt, tab_roi, tab_gear, tab_charms = st.tabs([
+    tab_sim, tab_opt, tab_roi, tab_gear, tab_charms, tab_gov = st.tabs([
         "Multi-Rally Simulator", 
         "Battle Optimizer", 
         "Stat Improvement Optimizer", 
         "Hero Gear Optimizer",
-        "Charm Optimizer"
+        "Charm Optimizer",
+        "Governor Gear Optimizer"
     ])
 
     # =========================================================================
@@ -1782,3 +1808,258 @@ else:
                     r_ch2.metric("Remaining Charm Designs", f"{ch_wallet['Designs']:,}")
                 else:
                     st.error("❌ The algorithm was unable to calculate an upgrade link. Verify your input balances or max upgrade constraints.")
+
+                    # =========================================================================
+    # --- TAB 6: GOVERNOR GEAR OPTIMIZER ---
+    # =========================================================================
+    with tab_gov:
+        st.header("👑 Governor Gear Optimizer")
+        st.caption("Calculates exact ROI across all 58 tiers, automatically factoring in Cumulative Set Bonuses and multi-resource bottlenecks.")
+
+        gov_atlas = load_governor_gear_atlas()
+        gov_names = gov_atlas["names"]
+
+        # -------------------------------------------------------------------------
+        # --- INVENTORY & SIDE CONFIG PANEL ---
+        # -------------------------------------------------------------------------
+        gv_main, gv_side = st.columns([2, 1])
+
+        with gv_side:
+            st.markdown("### 🎒 Governor Assets")
+            inv_satin = st.number_input("Available Satin", min_value=0, value=25000, step=1000, key="gv_inv_satin")
+            inv_threads = st.number_input("Available Gilded Threads", min_value=0, value=1200, step=50, key="gv_inv_threads")
+            inv_vision = st.number_input("Available Artisan's Vision", min_value=0, value=250, step=10, key="gv_inv_vision")
+            
+            st.markdown("---")
+            st.markdown("### ⚙️ Search Engine")
+            gv_precision = st.slider("MC Pass Precision", 10, 150, 40, step=10, key="gv_precision_slider")
+            gv_max_actions = st.number_input("Max Tiers to Map", min_value=1, max_value=20, value=6, step=1)
+
+        with gv_main:
+            st.markdown("### 🎖️ Current Governor Gear Tiers")
+            
+            gv_col1, gv_col2, gv_col3 = st.columns(3)
+            current_gov = {"infantry": [], "cavalry": [], "archer": []}
+            
+            with gv_col1:
+                st.markdown("#### 🛡️ Infantry")
+                # Using index 15 as a default ("Gold 0★")
+                lvl_0 = st.selectbox("Piece 1", range(len(gov_names)), format_func=lambda x: gov_names[x], index=15, key="gv_inf_0")
+                lvl_1 = st.selectbox("Piece 2", range(len(gov_names)), format_func=lambda x: gov_names[x], index=15, key="gv_inf_1")
+                current_gov["infantry"] = [lvl_0, lvl_1]
+                    
+            with gv_col2:
+                st.markdown("#### 🏇 Cavalry")
+                lvl_0 = st.selectbox("Piece 1", range(len(gov_names)), format_func=lambda x: gov_names[x], index=10, key="gv_cav_0")
+                lvl_1 = st.selectbox("Piece 2", range(len(gov_names)), format_func=lambda x: gov_names[x], index=10, key="gv_cav_1")
+                current_gov["cavalry"] = [lvl_0, lvl_1]
+                    
+            with gv_col3:
+                st.markdown("#### 🏹 Archer")
+                lvl_0 = st.selectbox("Piece 1", range(len(gov_names)), format_func=lambda x: gov_names[x], index=10, key="gv_arc_0")
+                lvl_1 = st.selectbox("Piece 2", range(len(gov_names)), format_func=lambda x: gov_names[x], index=10, key="gv_arc_1")
+                current_gov["archer"] = [lvl_0, lvl_1]
+
+            st.markdown("---")
+            
+            if st.button("🚀 Execute Governor Matrix Optimization", type="primary", use_container_width=True, key="gv_run_btn"):
+                gv_progress = st.progress(0)
+                gv_status = st.empty()
+                
+                # Snapshot wallets
+                gv_wallet = {"Satin": inv_satin, "Threads": inv_threads, "Vision": inv_vision}
+                running_gov = copy.deepcopy(current_gov)
+                gov_roadmap = []
+                
+                # Tracking accumulation matrix
+                accumulated_gains = {t: [0.0 for _ in range(2)] for t in ["infantry", "cavalry", "archer"]}
+                accumulated_costs = {t: [{"Satin": 0, "Threads": 0, "Vision": 0} for _ in range(2)] for t in ["infantry", "cavalry", "archer"]}
+                starting_gov = copy.deepcopy(current_gov)
+
+                def run_gov_isolated_simulation(gov_state):
+                    """Injects the baseline battle report stats modified by Governor Gear scaling + Set Bonuses."""
+                    my_stats_matrix = np.array([
+                        [my_ia, my_id, my_il, my_ih], 
+                        [my_ca, my_cd, my_cl, my_ch], 
+                        [my_aa, my_ad, my_al, my_ah]
+                    ])
+                    opp_stats_matrix = np.array([
+                        [opp_ia, opp_id, opp_il, opp_ih],
+                        [opp_ca, opp_cd, opp_cl, opp_ch],
+                        [opp_aa, opp_ad, opp_al, opp_ah]
+                    ])
+                    
+                    target_matrix = my_stats_matrix if opt_role == "Rally Attacker" else opp_stats_matrix
+                    
+                    # Process Gov Gear Stats + Set Bonuses
+                    for r, troop in enumerate(["infantry", "cavalry", "archer"]):
+                        piece_1_lvl = gov_state[troop][0]
+                        piece_2_lvl = gov_state[troop][1]
+                        
+                        # 1. Base Stats
+                        stat1_pct = sum(gov_atlas["deltas"][:piece_1_lvl+1])
+                        stat2_pct = sum(gov_atlas["deltas"][:piece_2_lvl+1])
+                        
+                        # 2. Cumulative Set Bonus Calculation (Key Mechanic!)
+                        # Set bonus is based on the lowest tier between the two pieces
+                        min_tier = min(piece_1_lvl, piece_2_lvl)
+                        set_bonus_pct = gov_atlas["set_bonuses"][min_tier]
+                        
+                        total_boost = stat1_pct + stat2_pct + set_bonus_pct
+                        
+                        # Apply equally to all 4 fundamental stats
+                        target_matrix[r, 0] += total_boost # Atk
+                        target_matrix[r, 1] += total_boost # Def
+                        target_matrix[r, 2] += total_boost # Leth
+                        target_matrix[r, 3] += total_boost # HP
+
+                    my_march = TroopSide([my_inf, my_cav, my_arc], my_stats_matrix, [my_h1, my_h2, my_h3], ["None"]*4)
+                    opp_march = TroopSide([opp_inf, opp_cav, opp_arc], opp_stats_matrix, [opp_h1, opp_h2, opp_h3], ["None"]*4)
+                    
+                    attacker_side = my_march if opt_role == "Rally Attacker" else opp_march
+                    defender_side = opp_march if opt_role == "Rally Attacker" else my_march
+                    
+                    total_surviving_target = 0
+                    for _ in range(gv_precision):
+                        res = kingshot_multirally_sim2([attacker_side.clone()], defender_side.clone())
+                        total_surviving_target += np.sum(res[1][0]['attacker_surviving']) if opt_role == "Rally Attacker" else np.sum(res[0].troops)
+                            
+                    return total_surviving_target / gv_precision
+
+                # -------------------------------------------------------------------------
+                # --- GREEDY SEARCH LOOP WITH TRIPLE SQUARED SCARCITY ---
+                # -------------------------------------------------------------------------
+                for action_step in range(1, gv_max_actions + 1):
+                    gv_status.markdown(f"**🔍 Calculating Optimal Governor Tier Step #{action_step}...**")
+                    
+                    control_surv = run_gov_isolated_simulation(running_gov)
+                    candidates = []
+                    
+                    # Triple Scarcity Weighting
+                    s_pool = max(1, gv_wallet["Satin"])
+                    t_pool = max(1, gv_wallet["Threads"])
+                    v_pool = max(1, gv_wallet["Vision"])
+                    
+                    w_satin = 1.0 / (s_pool ** 2)
+                    w_threads = 1.0 / (t_pool ** 2)
+                    w_vision = 1.0 / (v_pool ** 2)
+
+                    for troop in ["infantry", "cavalry", "archer"]:
+                        for slot_idx, current_lvl in enumerate(running_gov[troop]):
+                            if current_lvl >= 58: # Max level cap (Red T6 3★)
+                                continue 
+                                
+                            target_lvl = current_lvl + 1
+                            req_s = gov_atlas["satin"][target_lvl]
+                            req_t = gov_atlas["threads"][target_lvl]
+                            req_v = gov_atlas["vision"][target_lvl]
+                            
+                            if gv_wallet["Satin"] >= req_s and gv_wallet["Threads"] >= req_t and gv_wallet["Vision"] >= req_v:
+                                test_gov = copy.deepcopy(running_gov)
+                                test_gov[troop][slot_idx] += 1
+                                
+                                test_surv = run_gov_isolated_simulation(test_gov)
+                                troops_saved = max(0.001, test_surv - control_surv)
+                                
+                                # Budget Normalization Denominator
+                                resource_score = (req_s * w_satin) + (req_t * w_threads) + (req_v * w_vision)
+                                efficiency = troops_saved / max(1e-9, resource_score)
+                                
+                                candidates.append({
+                                    "troop": troop, "slot": slot_idx, "next_lvl": target_lvl,
+                                    "cost_s": req_s, "cost_t": req_t, "cost_v": req_v,
+                                    "efficiency": efficiency, "saved": troops_saved
+                                })
+
+                    if not candidates:
+                        gv_progress.progress(1.0)
+                        break
+                        
+                    # Commit the best step
+                    candidates.sort(key=lambda x: x["efficiency"], reverse=True)
+                    winner = candidates[0]
+                    
+                    gv_wallet["Satin"] -= winner["cost_s"]
+                    gv_wallet["Threads"] -= winner["cost_t"]
+                    gv_wallet["Vision"] -= winner["cost_v"]
+                    
+                    running_gov[winner["troop"]][winner["slot"]] += 1
+                    
+                    # Consolidate outputs
+                    lvl_idx = winner["next_lvl"]
+                    stat_gain_amt = gov_atlas["deltas"][lvl_idx]
+                    
+                    # Log base stat gains. Set bonus will be calculated globally at the end for display.
+                    accumulated_gains[winner["troop"]][winner["slot"]] += stat_gain_amt
+                    accumulated_costs[winner["troop"]][winner["slot"]]["Satin"] += winner["cost_s"]
+                    accumulated_costs[winner["troop"]][winner["slot"]]["Threads"] += winner["cost_t"]
+                    accumulated_costs[winner["troop"]][winner["slot"]]["Vision"] += winner["cost_v"]
+                    
+                    gov_roadmap.append(winner)
+                    gv_progress.progress(action_step / gv_max_actions)
+
+                gv_progress.empty()
+                gv_status.empty()
+
+                # -------------------------------------------------------------------------
+                # --- CONSOLIDATE AND DISPLAY FINAL BLUEPRINT ---
+                # -------------------------------------------------------------------------
+                if gov_roadmap:
+                    st.success("🎯 Optimal Governor Gear Roadmap Compiled Successfully!")
+                    
+                    consolidated_rows = []
+                    for troop in ["infantry", "cavalry", "archer"]:
+                        for slot_idx in range(2):
+                            start_l = starting_gov[troop][slot_idx]
+                            end_l = running_gov[troop][slot_idx]
+                            
+                            if start_l != end_l:
+                                costs = accumulated_costs[troop][slot_idx]
+                                cost_display = f"+{costs['Satin']:,} Satin"
+                                if costs['Threads'] > 0: cost_display += f", +{costs['Threads']:,} Threads"
+                                if costs['Vision'] > 0: cost_display += f", +{costs['Vision']:,} Vision"
+                                
+                                stat_gain = accumulated_gains[troop][slot_idx]
+                                
+                                # Format visual names
+                                str_start = gov_names[start_l]
+                                str_end = gov_names[end_l]
+                                
+                                consolidated_rows.append({
+                                    "Target Piece": f"{troop.capitalize()} Piece #{slot_idx + 1}",
+                                    "Tier Jump": f"{str_start} ➔ {str_end}",
+                                    "Required Resources": cost_display,
+                                    "Base Stat Yield": f"+{stat_gain:.2f}%"
+                                })
+                                
+                    st.subheader("📋 Consolidated Governor Upgrade Action Plan")
+                    if consolidated_rows:
+                        st.dataframe(pd.DataFrame(consolidated_rows), hide_index=True, use_container_width=True)
+                        
+                        # Highlight Set Bonus changes if any occurred
+                        st.markdown("#### ⚡ Set Bonus Impacts")
+                        set_bonus_text = []
+                        for troop in ["infantry", "cavalry", "archer"]:
+                            old_min = min(starting_gov[troop][0], starting_gov[troop][1])
+                            new_min = min(running_gov[troop][0], running_gov[troop][1])
+                            if old_min != new_min:
+                                old_bonus = gov_atlas["set_bonuses"][old_min]
+                                new_bonus = gov_atlas["set_bonuses"][new_min]
+                                set_bonus_text.append(f"- **{troop.capitalize()} Set:** Upgraded from +{old_bonus}% to **+{new_bonus}%**")
+                        
+                        if set_bonus_text:
+                            for text in set_bonus_text:
+                                st.success(text)
+                        else:
+                            st.info("No Set Bonus thresholds were crossed during this specific roadmap calculation.")
+                            
+                    else:
+                        st.info("No transitions occurred. Upgrades analyzed were outvalued by core budget limits.")
+                        
+                    st.markdown("#### 👛 Remaining Asset Reserves After Processing")
+                    r_g1, r_g2, r_g3 = st.columns(3)
+                    r_g1.metric("Remaining Satin", f"{gv_wallet['Satin']:,}")
+                    r_g2.metric("Remaining Gilded Threads", f"{gv_wallet['Threads']:,}")
+                    r_g3.metric("Remaining Artisan's Vision", f"{gv_wallet['Vision']:,}")
+                else:
+                    st.error("❌ The algorithm was unable to calculate an upgrade link. Verify your input balances.")
