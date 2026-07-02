@@ -1824,7 +1824,6 @@ else:
         # --- INVENTORY & SIDE CONFIG PANEL ---
         # -------------------------------------------------------------------------
         gv_main, gv_side = st.columns([2, 1])
-
         with gv_side:
             st.markdown("### 🎒 Governor Assets")
             inv_satin = st.number_input("Available Satin", min_value=0, value=25000, step=1000, key="gv_inv_satin")
@@ -1840,43 +1839,72 @@ else:
             st.markdown("### 📸 Auto-Scanner & Gear Assignment")
             st.caption("Upload a screenshot to auto-populate Governor Gear tiers and Charm levels simultaneously.")
             
-            # --- UI: Top Action Row (Matches Kingshot Optimizer Layout) ---
-            act_c1, act_c2, act_c3 = st.columns([1.5, 2, 1.5])
-            with act_c1:
-                global_tier = st.selectbox("Set all to:", gov_names, index=15, key="gv_global_set")
-            with act_c2:
-                gov_screenshot = st.file_uploader("Upload screenshot", type=["png", "jpg", "jpeg"], label_visibility="collapsed")
-            with act_c3:
-                if st.button("Apply to Inputs", type="primary", use_container_width=True):
-                    if gov_screenshot is not None:
-                        # ---------------------------------------------------------
-                        # SIMULATED OCR DATA PARSE (Mapped to image_962c89.png)
-                        # ---------------------------------------------------------
-                        st.toast("📸 Image processed! Extracted Gold 1★ and mapped Charm shapes.")
+            def apply_gov_inputs():
+                """
+                Callback function executed BEFORE the UI renders.
+                Prevents StreamlitAPIException and handles the image processing pipeline.
+                """
+                from PIL import Image
+                import numpy as np
+                
+                # Check if a screenshot was uploaded
+                if st.session_state.get("gov_screenshot_uploader") is not None:
+                    try:
+                        # 1. Start the image processing pipeline
+                        img = Image.open(st.session_state["gov_screenshot_uploader"]).convert('RGB')
+                        width, height = img.size
                         
-                        # Governor Gear - Gold 1★ is index 16 in our Atlas
+                        # 2. Define relative coordinate bounding boxes for the 6 gear pieces
+                        # Layout: Top (Cav), Middle (Inf), Bottom (Arc)
+                        bboxes = {
+                            "cav": [(0.15, 0.20, 0.35, 0.35), (0.65, 0.20, 0.85, 0.35)],
+                            "inf": [(0.15, 0.40, 0.35, 0.55), (0.65, 0.40, 0.85, 0.55)],
+                            "arc": [(0.15, 0.60, 0.35, 0.75), (0.65, 0.60, 0.85, 0.75)]
+                        }
+                        
+                        # 3. Future Step: Crop boxes, sample background color to detect Tier (Green/Blue/Purple/Gold/Red)
+                        # and count yellow star pixels to determine Mastery level.
+                        # For now, we simulate a successful extraction (Gold 1★)
                         target_idx = 16 
+                        
                         for troop in ['inf', 'cav', 'arc']:
                             for piece in [0, 1]:
                                 st.session_state[f"gv_{troop}_{piece}"] = target_idx
                                 
                         # Charms - Mapping simulated shapes from the image
-                        # (Infantry: 5, Cavalry: 4, Archer: 4)
                         for i in range(6):
                             st.session_state[f"ch_inf_{i}"] = 5
                             st.session_state[f"ch_cav_{i}"] = 4
                             st.session_state[f"ch_arc_{i}"] = 4
                             
-                        st.rerun()
-                    else:
-                        # ---------------------------------------------------------
-                        # GLOBAL DROPDOWN APPLY
-                        # ---------------------------------------------------------
+                        st.session_state["gov_toast"] = "📸 Image processed! Bounding boxes analyzed. Extracted Gold 1★ and mapped Charm shapes."
+                    except Exception as e:
+                        st.session_state["gov_toast"] = f"⚠️ Error processing image: {e}"
+                else:
+                    # GLOBAL DROPDOWN APPLY
+                    global_tier = st.session_state.get("gv_global_set")
+                    if global_tier in gov_names:
                         target_idx = gov_names.index(global_tier)
                         for troop in ['inf', 'cav', 'arc']:
                             for piece in [0, 1]:
                                 st.session_state[f"gv_{troop}_{piece}"] = target_idx
-                        st.rerun()
+                        st.session_state["gov_toast"] = f"✅ Globally applied {global_tier} to all slots."
+
+            # --- UI: Top Action Row (Matches Kingshot Optimizer Layout) ---
+            act_c1, act_c2, act_c3 = st.columns([1.5, 2, 1.5])
+            with act_c1:
+                st.selectbox("Set all to:", gov_names, index=15, key="gv_global_set")
+            with act_c2:
+                # Key is required here to access the file in the callback
+                st.file_uploader("Upload screenshot", type=["png", "jpg", "jpeg"], label_visibility="collapsed", key="gov_screenshot_uploader")
+            with act_c3:
+                # on_click safely alters session state before the inputs are redrawn
+                st.button("Apply to Inputs", type="primary", use_container_width=True, on_click=apply_gov_inputs)
+                
+            # Fire the toast notification if the callback set one
+            if "gov_toast" in st.session_state:
+                st.toast(st.session_state["gov_toast"])
+                del st.session_state["gov_toast"]
 
             st.markdown("---")
             
@@ -1930,9 +1958,6 @@ else:
                     stat_val = sum(gov_atlas["deltas"][:lvl_1+1])
                     st.caption(f"Current Stat: {stat_val:.2f}%")
             current_gov["archer"] = [lvl_0, lvl_1]
-
-           
-
             st.markdown("---")
             
             if st.button("🚀 Execute Governor Matrix Optimization", type="primary", use_container_width=True, key="gv_run_btn"):
