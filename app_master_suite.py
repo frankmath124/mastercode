@@ -1842,7 +1842,7 @@ else:
             def apply_gov_inputs():
                 """
                 Callback function executed BEFORE the UI renders.
-                Implements a custom PIL + NumPy dynamic histogram scanner.
+                Implements an advanced PIL + NumPy Euclidean Distance color cluster scanner.
                 """
                 from PIL import Image
                 import numpy as np
@@ -1851,78 +1851,97 @@ else:
                     try:
                         img = Image.open(st.session_state["gov_screenshot_uploader"]).convert('RGB')
                         img_np = np.array(img)
+                        h, w = img_np.shape[:2]
                         
-                        def process_column(img_arr, side):
-                            """Dynamically finds the 3 gear boxes in a vertical column using color density."""
-                            h, w = img_arr.shape[:2]
-                            # Look at the left 10-40% or the right 60-90% of the screen
-                            x_start = int(w * 0.10) if side == "left" else int(w * 0.60)
-                            x_end = int(w * 0.40) if side == "left" else int(w * 0.90)
+                        def analyze_item_crop(item_crop):
+                            """Uses Euclidean distance to find the dominant tier color, and horizontal projection to count stars."""
+                            r = item_crop[:,:,0].astype(int)
+                            g = item_crop[:,:,1].astype(int)
+                            b = item_crop[:,:,2].astype(int)
                             
-                            col_crop = img_arr[:, x_start:x_end]
+                            # Isolate colorful pixels (ignores the gray/sky UI backgrounds)
+                            rg_diff, rb_diff, gb_diff = np.abs(r-g), np.abs(r-b), np.abs(g-b)
+                            max_diff = np.maximum(np.maximum(rg_diff, rb_diff), gb_diff)
+                            colorful = (max_diff > 30) & (r+g+b > 100)
                             
-                            # Convert to float for safe math operations without uint8 overflow
-                            r = col_crop[:,:,0].astype(float)
-                            g = col_crop[:,:,1].astype(float)
-                            b = col_crop[:,:,2].astype(float)
+                            best_tier = "Gold"
                             
-                            # Strict color masks filtering out sky and UI grays
-                            is_red = (r > 150) & (g < 100) & (b < 100)
-                            is_gold = (r > 150) & (g > 120) & (b < 100)
-                            is_purple = (r > 100) & (g < 120) & (b > 120)
-                            is_blue = (b > 130) & (r < 120) & (b > g + 10)
-                            is_green = (g > 120) & (r < 120) & (b < 120)
+                            if np.any(colorful):
+                                # True RGB centers of the Kingshot gear tiers
+                                centers = {
+                                    "Red": np.array([220, 50, 50]),
+                                    "Gold": np.array([240, 180, 50]),
+                                    "Green": np.array([110, 190, 40]),
+                                    "Blue": np.array([70, 180, 230]), # Cyan-heavy
+                                    "Purple": np.array([180, 80, 220])
+                                }
+                                
+                                cr, cg, cb = r[colorful], g[colorful], b[colorful]
+                                pixels = np.stack([cr, cg, cb], axis=1)
+                                
+                                max_votes = 0
+                                for tier, center in centers.items():
+                                    # Calculate mathematical distance of every pixel to the tier center
+                                    dist = np.linalg.norm(pixels - center, axis=1)
+                                    votes = np.sum(dist < 90) # Tolerance radius
+                                    if votes > max_votes:
+                                        max_votes = votes
+                                        best_tier = tier
+
+                            # --- MASTERY STAR DETECTION ---
+                            # Restrict search to the bottom 30% and left 70% to avoid Gold gear background interference
+                            ch, cw = item_crop.shape[:2]
+                            star_area = item_crop[int(ch*0.70):, :int(cw*0.70)]
+                            sr = star_area[:,:,0].astype(int)
+                            sg = star_area[:,:,1].astype(int)
+                            sb = star_area[:,:,2].astype(int)
                             
-                            gear_mask = is_red | is_gold | is_purple | is_blue | is_green
+                            # Extremely bright, strict yellow mask
+                            yellow = (sr > 220) & (sg > 200) & (sb < 100)
                             
-                            # Project mask horizontally to find the Y-coordinates of the gear boxes
-                            y_profile = gear_mask.sum(axis=1)
-                            # A valid row must have at least 10% of its width composed of a tier color
-                            active_rows = np.where(y_profile > (x_end - x_start) * 0.10)[0]
+                            # Horizontal projection (squash vertically into 1D array)
+                            col_sums = yellow.sum(axis=0)
+                            # A column must have at least 2 yellow pixels to be part of a star
+                            star_cols = (col_sums > 2).astype(int)
+                            
+                            # Count 0 -> 1 transitions to find the exact number of distinct star "blobs"
+                            transitions = np.diff(np.concatenate(([0], star_cols)))
+                            num_stars = np.sum(transitions == 1)
+                            
+                            return best_tier, min(max(num_stars, 0), 3)
+
+                        def process_column(side):
+                            """Slices the left or right side of the screen and extracts the 3 vertical gear boxes."""
+                            x1 = int(w * 0.05) if side == "left" else int(w * 0.55)
+                            x2 = int(w * 0.45) if side == "left" else int(w * 0.95)
+                            y1, y2 = int(h * 0.15), int(h * 0.85)
+                            
+                            col_img = img_np[y1:y2, x1:x2]
+                            cr = col_img[:,:,0].astype(int)
+                            cg = col_img[:,:,1].astype(int)
+                            cb = col_img[:,:,2].astype(int)
+                            
+                            # Build a vertical density map to find where the gear boxes are physically located
+                            rg_diff, rb_diff, gb_diff = np.abs(cr-cg), np.abs(cr-cb), np.abs(cg-cb)
+                            max_diff = np.maximum(np.maximum(rg_diff, rb_diff), gb_diff)
+                            colorful = (max_diff > 30) & (cr+cg+cb > 100)
+                            
+                            y_density = colorful.sum(axis=1)
+                            active_rows = np.where(y_density > 15)[0]
                             
                             if len(active_rows) == 0:
-                                return [("Gold", 0), ("Gold", 0), ("Gold", 0)]
+                                return [("Gold", 0)] * 3
                                 
-                            # Split into distinct segments whenever there is a gap > 3% of the image height
-                            segments = np.split(active_rows, np.where(np.diff(active_rows) > int(h * 0.03))[0] + 1)
-                            
-                            # Keep the 3 largest segments (the actual gear boxes) and sort top-to-bottom
-                            segments = sorted(segments, key=len, reverse=True)[:3]
-                            segments = sorted(segments, key=lambda s: s[0])
+                            # Slice the column into discrete blocks where there is blank space between gears
+                            segments = np.split(active_rows, np.where(np.diff(active_rows) > 10)[0] + 1)
+                            segments = [seg for seg in segments if len(seg) > 20] # Must be at least 20px tall
+                            segments = sorted(segments, key=len, reverse=True)[:3] # Grab the 3 biggest blocks
+                            segments = sorted(segments, key=lambda s: s[0]) # Sort Top to Bottom
                             
                             results = []
                             for seg in segments:
-                                if len(seg) < 10: 
-                                    results.append(("Gold", 0))
-                                    continue
-                                    
-                                gear_box = col_crop[seg[0]:seg[-1], :]
-                                br, bg, bb = gear_box[:,:,0].astype(float), gear_box[:,:,1].astype(float), gear_box[:,:,2].astype(float)
-                                
-                                # Count absolute pixel presence to vote for the dominant tier background
-                                counts = {
-                                    "Red": ((br > 150) & (bg < 100) & (bb < 100)).sum(),
-                                    "Gold": ((br > 150) & (bg > 120) & (bb < 100)).sum(),
-                                    "Purple": ((br > 100) & (bg < 120) & (bb > 120)).sum(),
-                                    "Blue": ((bb > 130) & (br < 120) & (bb > bg + 10)).sum(),
-                                    "Green": ((bg > 120) & (br < 120) & (bb < 120)).sum(),
-                                }
-                                tier = max(counts, key=counts.get)
-                                if counts[tier] < 10: tier = "Gold" # Safe fallback
-                                
-                                # Isolate the bottom half of the gear box to count yellow Mastery Stars
-                                bh, bw = gear_box.shape[:2]
-                                bottom_half = gear_box[int(bh*0.5):, :]
-                                star_mask = (bottom_half[:,:,0] > 180) & (bottom_half[:,:,1] > 150) & (bottom_half[:,:,2] < 100)
-                                
-                                # Measure star density as a % of the area (makes it resolution-independent)
-                                star_pct = star_mask.sum() / (bh * 0.5 * bw)
-                                
-                                stars = 0
-                                if star_pct > 0.08: stars = 3
-                                elif star_pct > 0.035: stars = 2
-                                elif star_pct > 0.005: stars = 1
-                                
+                                item_crop = col_img[seg[0]:seg[-1], :]
+                                tier, stars = analyze_item_crop(item_crop)
                                 results.append((tier, stars))
                                 
                             while len(results) < 3:
@@ -1930,16 +1949,16 @@ else:
                                 
                             return results
                         
-                        # Process both columns simultaneously
-                        left_res = process_column(img_np, "left")
-                        right_res = process_column(img_np, "right")
+                        # Execute the pipelines!
+                        left_res = process_column("left")
+                        right_res = process_column("right")
                         
                         def set_tier(troop, piece_idx, res_tuple):
                             t_name = f"{res_tuple[0]} {res_tuple[1]}★"
                             if t_name in gov_names:
                                 st.session_state[f"gv_{troop}_{piece_idx}"] = gov_names.index(t_name)
                         
-                        # Map to the specific UI elements
+                        # Top = Cavalry, Mid = Infantry, Bottom = Archer
                         set_tier("cav", 0, left_res[0])
                         set_tier("inf", 0, left_res[1])
                         set_tier("arc", 0, left_res[2])
@@ -1948,13 +1967,13 @@ else:
                         set_tier("inf", 1, right_res[1])
                         set_tier("arc", 1, right_res[2])
                         
-                        # Charms - Kept as placeholders since charm levels 1-22 are not visible as text on this screen
+                        # Charms - Safe fallbacks (Tiny text unsupported by visual inference)
                         for i in range(6):
                             st.session_state[f"ch_inf_{i}"] = 5
                             st.session_state[f"ch_cav_{i}"] = 4
                             st.session_state[f"ch_arc_{i}"] = 4
                             
-                        st.session_state["gov_toast"] = "📸 Dynamic CV Analysis Complete! Found tier colors and mastery stars."
+                        st.session_state["gov_toast"] = "📸 Euclidean Visual Analysis Complete! Successfully extracted gear tiers and mastery stars."
                     except Exception as e:
                         st.session_state["gov_toast"] = f"⚠️ Image processing error: {e}"
                 else:
@@ -2037,6 +2056,8 @@ else:
             current_gov["archer"] = [lvl_0, lvl_1]
 
             st.markdown("---")
+            
+           
             
 
             
