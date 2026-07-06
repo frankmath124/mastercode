@@ -1842,87 +1842,119 @@ else:
             def apply_gov_inputs():
                 """
                 Callback function executed BEFORE the UI renders.
-                Implements a custom PIL + EasyOCR computer vision pipeline.
+                Implements a custom PIL + NumPy dynamic histogram scanner.
                 """
                 from PIL import Image
                 import numpy as np
                 
-                # Check if a screenshot was uploaded
                 if st.session_state.get("gov_screenshot_uploader") is not None:
                     try:
-                        # 1. Fetch our globally cached EasyOCR reader and process the image
-                        reader = load_ocr_reader()
                         img = Image.open(st.session_state["gov_screenshot_uploader"]).convert('RGB')
                         img_np = np.array(img)
-                        h, w = img_np.shape[:2]
                         
-                        # 2. Define relative coordinate bounding boxes based on the mobile layout
-                        # Dictionary maps: [Y_start, Y_end, X_start, X_end] as percentages
-                        bboxes = {
-                            "cav": {"0": (0.20, 0.32, 0.15, 0.38), "1": (0.20, 0.32, 0.62, 0.85)},
-                            "inf": {"0": (0.45, 0.57, 0.15, 0.38), "1": (0.45, 0.57, 0.62, 0.85)},
-                            "arc": {"0": (0.68, 0.80, 0.15, 0.38), "1": (0.68, 0.80, 0.62, 0.85)}
-                        }
-                        
-                        for troop in ['cav', 'inf', 'arc']:
-                            for piece in ["0", "1"]:
-                                y1, y2, x1, x2 = bboxes[troop][piece]
+                        def process_column(img_arr, side):
+                            """Dynamically finds the 3 gear boxes in a vertical column using color density."""
+                            h, w = img_arr.shape[:2]
+                            # Look at the left 10-40% or the right 60-90% of the screen
+                            x_start = int(w * 0.10) if side == "left" else int(w * 0.60)
+                            x_end = int(w * 0.40) if side == "left" else int(w * 0.90)
+                            
+                            col_crop = img_arr[:, x_start:x_end]
+                            
+                            # Convert to float for safe math operations without uint8 overflow
+                            r = col_crop[:,:,0].astype(float)
+                            g = col_crop[:,:,1].astype(float)
+                            b = col_crop[:,:,2].astype(float)
+                            
+                            # Strict color masks filtering out sky and UI grays
+                            is_red = (r > 150) & (g < 100) & (b < 100)
+                            is_gold = (r > 150) & (g > 120) & (b < 100)
+                            is_purple = (r > 100) & (g < 120) & (b > 120)
+                            is_blue = (b > 130) & (r < 120) & (b > g + 10)
+                            is_green = (g > 120) & (r < 120) & (b < 120)
+                            
+                            gear_mask = is_red | is_gold | is_purple | is_blue | is_green
+                            
+                            # Project mask horizontally to find the Y-coordinates of the gear boxes
+                            y_profile = gear_mask.sum(axis=1)
+                            # A valid row must have at least 10% of its width composed of a tier color
+                            active_rows = np.where(y_profile > (x_end - x_start) * 0.10)[0]
+                            
+                            if len(active_rows) == 0:
+                                return [("Gold", 0), ("Gold", 0), ("Gold", 0)]
                                 
-                                # Crop the specific gear piece and the charms strip directly below it
-                                gear_crop = img_np[int(y1*h):int(y2*h), int(x1*w):int(x2*w)]
-                                charm_crop = img_np[int(y2*h):int((y2+0.05)*h), int(x1*w):int(x2*w)]
+                            # Split into distinct segments whenever there is a gap > 3% of the image height
+                            segments = np.split(active_rows, np.where(np.diff(active_rows) > int(h * 0.03))[0] + 1)
+                            
+                            # Keep the 3 largest segments (the actual gear boxes) and sort top-to-bottom
+                            segments = sorted(segments, key=len, reverse=True)[:3]
+                            segments = sorted(segments, key=lambda s: s[0])
+                            
+                            results = []
+                            for seg in segments:
+                                if len(seg) < 10: 
+                                    results.append(("Gold", 0))
+                                    continue
+                                    
+                                gear_box = col_crop[seg[0]:seg[-1], :]
+                                br, bg, bb = gear_box[:,:,0].astype(float), gear_box[:,:,1].astype(float), gear_box[:,:,2].astype(float)
                                 
-                                # --- STEP A: DETECT GEAR TIER VIA RGB SAMPLING ---
-                                # Sample the top-left corner to get the pure background color
-                                corner = gear_crop[0:15, 0:15] 
-                                r, g, b = corner.mean(axis=(0,1))
+                                # Count absolute pixel presence to vote for the dominant tier background
+                                counts = {
+                                    "Red": ((br > 150) & (bg < 100) & (bb < 100)).sum(),
+                                    "Gold": ((br > 150) & (bg > 120) & (bb < 100)).sum(),
+                                    "Purple": ((br > 100) & (bg < 120) & (bb > 120)).sum(),
+                                    "Blue": ((bb > 130) & (br < 120) & (bb > bg + 10)).sum(),
+                                    "Green": ((bg > 120) & (br < 120) & (bb < 120)).sum(),
+                                }
+                                tier = max(counts, key=counts.get)
+                                if counts[tier] < 10: tier = "Gold" # Safe fallback
                                 
-                                tier = "Gold" # Safe default
-                                if r > 160 and g < 100 and b < 100: tier = "Red"
-                                elif r > 150 and g > 120 and b < 100: tier = "Gold"
-                                elif r > 100 and g < 100 and b > 130: tier = "Purple"
-                                elif b > 130 and r < 100: tier = "Blue"
-                                elif g > 130 and r < 130 and b < 130: tier = "Green"
+                                # Isolate the bottom half of the gear box to count yellow Mastery Stars
+                                bh, bw = gear_box.shape[:2]
+                                bottom_half = gear_box[int(bh*0.5):, :]
+                                star_mask = (bottom_half[:,:,0] > 180) & (bottom_half[:,:,1] > 150) & (bottom_half[:,:,2] < 100)
                                 
-                                # --- STEP B: DETECT MASTERY VIA YELLOW PIXEL DENSITY ---
-                                # Crop the bottom-left quadrant where the stars are located
-                                gh, gw = gear_crop.shape[:2]
-                                bl_corner = gear_crop[int(gh*0.6):, 0:int(gw*0.5)]
-                                # Identify yellow pixels (High Red & Green, Low Blue)
-                                yellow_mask = (bl_corner[:,:,0] > 180) & (bl_corner[:,:,1] > 150) & (bl_corner[:,:,2] < 100)
-                                yellow_pixels = np.sum(yellow_mask)
+                                # Measure star density as a % of the area (makes it resolution-independent)
+                                star_pct = star_mask.sum() / (bh * 0.5 * bw)
                                 
                                 stars = 0
-                                if yellow_pixels > 200: stars = 3
-                                elif yellow_pixels > 100: stars = 2
-                                elif yellow_pixels > 30: stars = 1
+                                if star_pct > 0.08: stars = 3
+                                elif star_pct > 0.035: stars = 2
+                                elif star_pct > 0.005: stars = 1
                                 
-                                # Construct the string and map it to the exact index in your atlas
-                                target_name = f"{tier} {stars}★"
-                                if target_name in gov_names:
-                                    st.session_state[f"gv_{troop}_{piece}"] = gov_names.index(target_name)
-                                    
-                                # --- STEP C: OCR CHARM EXTRACTION ---
-                                # Feed the cropped strip to EasyOCR looking strictly for numbers
-                                results = reader.readtext(charm_crop, allowlist='0123456789')
-                                results.sort(key=lambda x: x[0][0][0]) # Sort Left to Right physically
+                                results.append((tier, stars))
                                 
-                                charm_lvls = []
-                                for bbox_res, text, prob in results:
-                                    if text.isdigit() and 0 <= int(text) <= 22:
-                                        charm_lvls.append(int(text))
+                            while len(results) < 3:
+                                results.append(("Gold", 0))
                                 
-                                # If the image is blurry and OCR misses a charm, pad it with a safe default
-                                while len(charm_lvls) < 3:
-                                    charm_lvls.append(4) 
-                                    
-                                # Route the 3 charm levels into the 6 available slots per troop type
-                                offset = 0 if piece == "0" else 3
-                                st.session_state[f"ch_{troop}_{offset}"] = charm_lvls[0]
-                                st.session_state[f"ch_{troop}_{offset+1}"] = charm_lvls[1]
-                                st.session_state[f"ch_{troop}_{offset+2}"] = charm_lvls[2]
-
-                        st.session_state["gov_toast"] = "📸 Computer Vision extraction complete! Successfully mapped Tier colors, Mastery stars, and Charm layouts."
+                            return results
+                        
+                        # Process both columns simultaneously
+                        left_res = process_column(img_np, "left")
+                        right_res = process_column(img_np, "right")
+                        
+                        def set_tier(troop, piece_idx, res_tuple):
+                            t_name = f"{res_tuple[0]} {res_tuple[1]}★"
+                            if t_name in gov_names:
+                                st.session_state[f"gv_{troop}_{piece_idx}"] = gov_names.index(t_name)
+                        
+                        # Map to the specific UI elements
+                        set_tier("cav", 0, left_res[0])
+                        set_tier("inf", 0, left_res[1])
+                        set_tier("arc", 0, left_res[2])
+                        
+                        set_tier("cav", 1, right_res[0])
+                        set_tier("inf", 1, right_res[1])
+                        set_tier("arc", 1, right_res[2])
+                        
+                        # Charms - Kept as placeholders since charm levels 1-22 are not visible as text on this screen
+                        for i in range(6):
+                            st.session_state[f"ch_inf_{i}"] = 5
+                            st.session_state[f"ch_cav_{i}"] = 4
+                            st.session_state[f"ch_arc_{i}"] = 4
+                            
+                        st.session_state["gov_toast"] = "📸 Dynamic CV Analysis Complete! Found tier colors and mastery stars."
                     except Exception as e:
                         st.session_state["gov_toast"] = f"⚠️ Image processing error: {e}"
                 else:
@@ -2005,6 +2037,8 @@ else:
             current_gov["archer"] = [lvl_0, lvl_1]
 
             st.markdown("---")
+            
+
             
 
 # ... existing code ...
