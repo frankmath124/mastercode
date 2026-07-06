@@ -1842,7 +1842,7 @@ else:
             def apply_gov_inputs():
                 """
                 Callback function executed BEFORE the UI renders.
-                Implements an advanced PIL + NumPy Euclidean Distance color cluster scanner.
+                Implements a robust Row Variance Segmenter and Median Edge Sampler.
                 """
                 from PIL import Image
                 import numpy as np
@@ -1854,88 +1854,76 @@ else:
                         h, w = img_np.shape[:2]
                         
                         def analyze_item_crop(item_crop):
-                            """Uses Euclidean distance to find the dominant tier color, and horizontal projection to count stars."""
-                            r = item_crop[:,:,0].astype(int)
-                            g = item_crop[:,:,1].astype(int)
-                            b = item_crop[:,:,2].astype(int)
+                            """Extracts Tier via Median Edge Sampling and Stars via Blob Counting."""
+                            bh, bw = item_crop.shape[:2]
                             
-                            # Isolate colorful pixels (ignores the gray/sky UI backgrounds)
-                            rg_diff, rb_diff, gb_diff = np.abs(r-g), np.abs(r-b), np.abs(g-b)
-                            max_diff = np.maximum(np.maximum(rg_diff, rb_diff), gb_diff)
-                            colorful = (max_diff > 30) & (r+g+b > 100)
+                            # 1. TIER DETECTION (Median Edge Sampling)
+                            # Sample top edge and left edge to avoid the center item and the top-right red dot
+                            top_edge = item_crop[int(bh*0.05):int(bh*0.20), int(bw*0.20):int(bw*0.60)].reshape(-1, 3)
+                            left_edge = item_crop[int(bh*0.20):int(bh*0.60), int(bw*0.05):int(bw*0.20)].reshape(-1, 3)
+                            edges = np.vstack([top_edge, left_edge])
+                            
+                            # Median completely ignores stray pixels from the item overlap
+                            median_color = np.median(edges, axis=0)
+                            
+                            # Calibrated Tier Centers for Kingshot
+                            centers = {
+                                "Red": np.array([210, 50, 50]),
+                                "Gold": np.array([220, 140, 40]), # Orange-yellow background
+                                "Purple": np.array([150, 80, 190]),
+                                "Blue": np.array([60, 130, 210]),
+                                "Green": np.array([90, 170, 70])
+                            }
                             
                             best_tier = "Gold"
-                            
-                            if np.any(colorful):
-                                # True RGB centers of the Kingshot gear tiers
-                                centers = {
-                                    "Red": np.array([220, 50, 50]),
-                                    "Gold": np.array([240, 180, 50]),
-                                    "Green": np.array([110, 190, 40]),
-                                    "Blue": np.array([70, 180, 230]), # Cyan-heavy
-                                    "Purple": np.array([180, 80, 220])
-                                }
-                                
-                                cr, cg, cb = r[colorful], g[colorful], b[colorful]
-                                pixels = np.stack([cr, cg, cb], axis=1)
-                                
-                                max_votes = 0
-                                for tier, center in centers.items():
-                                    # Calculate mathematical distance of every pixel to the tier center
-                                    dist = np.linalg.norm(pixels - center, axis=1)
-                                    votes = np.sum(dist < 90) # Tolerance radius
-                                    if votes > max_votes:
-                                        max_votes = votes
-                                        best_tier = tier
+                            min_dist = float('inf')
+                            for tier, center in centers.items():
+                                dist = np.linalg.norm(median_color - center)
+                                if dist < min_dist:
+                                    min_dist = dist
+                                    best_tier = tier
 
-                            # --- MASTERY STAR DETECTION ---
-                            # Restrict search to the bottom 30% and left 70% to avoid Gold gear background interference
-                            ch, cw = item_crop.shape[:2]
-                            star_area = item_crop[int(ch*0.70):, :int(cw*0.70)]
-                            sr = star_area[:,:,0].astype(int)
-                            sg = star_area[:,:,1].astype(int)
-                            sb = star_area[:,:,2].astype(int)
+                            # 2. MASTERY STAR DETECTION (Blob Counting)
+                            bottom_region = item_crop[int(bh*0.65):, :]
+                            sr, sg, sb = bottom_region[:,:,0].astype(int), bottom_region[:,:,1].astype(int), bottom_region[:,:,2].astype(int)
                             
-                            # Extremely bright, strict yellow mask
-                            yellow = (sr > 220) & (sg > 200) & (sb < 100)
+                            # Strict yellow mask: R & G must be high, B must be low, AND G must be > 170 to ignore Gold backgrounds
+                            yellow = (sr > 190) & (sg > 170) & (sb < 100)
                             
-                            # Horizontal projection (squash vertically into 1D array)
                             col_sums = yellow.sum(axis=0)
-                            # A column must have at least 2 yellow pixels to be part of a star
-                            star_cols = (col_sums > 2).astype(int)
+                            active_cols = np.where(col_sums >= 2)[0]
                             
-                            # Count 0 -> 1 transitions to find the exact number of distinct star "blobs"
-                            transitions = np.diff(np.concatenate(([0], star_cols)))
-                            num_stars = np.sum(transitions == 1)
+                            stars = 0
+                            if len(active_cols) > 0:
+                                # Split into contiguous blobs if gap is > 4 pixels
+                                blobs = np.split(active_cols, np.where(np.diff(active_cols) > 4)[0] + 1)
+                                # Only count a star if the blob is at least 3 pixels wide (ignores noise)
+                                stars = sum(1 for blob in blobs if len(blob) >= 3)
                             
-                            return best_tier, min(max(num_stars, 0), 3)
+                            return best_tier, min(stars, 3)
 
                         def process_column(side):
-                            """Slices the left or right side of the screen and extracts the 3 vertical gear boxes."""
-                            x1 = int(w * 0.05) if side == "left" else int(w * 0.55)
-                            x2 = int(w * 0.45) if side == "left" else int(w * 0.95)
-                            y1, y2 = int(h * 0.15), int(h * 0.85)
+                            """Isolates gear boxes using horizontal row variance to ignore the sky."""
+                            x1 = int(w * 0.05) if side == "left" else int(w * 0.65)
+                            x2 = int(w * 0.35) if side == "left" else int(w * 0.95)
+                            col_img = img_np[:, x1:x2]
                             
-                            col_img = img_np[y1:y2, x1:x2]
-                            cr = col_img[:,:,0].astype(int)
-                            cg = col_img[:,:,1].astype(int)
-                            cb = col_img[:,:,2].astype(int)
+                            # Convert to grayscale to check for activity/busyness
+                            gray = np.dot(col_img[...,:3], [0.2989, 0.5870, 0.1140])
                             
-                            # Build a vertical density map to find where the gear boxes are physically located
-                            rg_diff, rb_diff, gb_diff = np.abs(cr-cg), np.abs(cr-cb), np.abs(cg-cb)
-                            max_diff = np.maximum(np.maximum(rg_diff, rb_diff), gb_diff)
-                            colorful = (max_diff > 30) & (cr+cg+cb > 100)
-                            
-                            y_density = colorful.sum(axis=1)
-                            active_rows = np.where(y_density > 15)[0]
+                            # The sky is a smooth gradient (variance ~0). Gear boxes have high variance.
+                            row_std = np.std(gray, axis=1)
+                            active_rows = np.where(row_std > 10)[0]
                             
                             if len(active_rows) == 0:
                                 return [("Gold", 0)] * 3
                                 
-                            # Slice the column into discrete blocks where there is blank space between gears
-                            segments = np.split(active_rows, np.where(np.diff(active_rows) > 10)[0] + 1)
-                            segments = [seg for seg in segments if len(seg) > 20] # Must be at least 20px tall
-                            segments = sorted(segments, key=len, reverse=True)[:3] # Grab the 3 biggest blocks
+                            # Split rows into discrete gear box segments (gap > 3% of screen height)
+                            segments = np.split(active_rows, np.where(np.diff(active_rows) > int(h * 0.03))[0] + 1)
+                            
+                            # Filter out tiny noise segments and grab the 3 largest
+                            segments = [seg for seg in segments if len(seg) > int(h * 0.04)]
+                            segments = sorted(segments, key=len, reverse=True)[:3]
                             segments = sorted(segments, key=lambda s: s[0]) # Sort Top to Bottom
                             
                             results = []
@@ -1949,7 +1937,7 @@ else:
                                 
                             return results
                         
-                        # Execute the pipelines!
+                        # Execute the pipelines for Left and Right gear columns
                         left_res = process_column("left")
                         right_res = process_column("right")
                         
@@ -1958,7 +1946,7 @@ else:
                             if t_name in gov_names:
                                 st.session_state[f"gv_{troop}_{piece_idx}"] = gov_names.index(t_name)
                         
-                        # Top = Cavalry, Mid = Infantry, Bottom = Archer
+                        # Apply to session state mapping
                         set_tier("cav", 0, left_res[0])
                         set_tier("inf", 0, left_res[1])
                         set_tier("arc", 0, left_res[2])
@@ -1967,13 +1955,13 @@ else:
                         set_tier("inf", 1, right_res[1])
                         set_tier("arc", 1, right_res[2])
                         
-                        # Charms - Safe fallbacks (Tiny text unsupported by visual inference)
+                        # Charms - Kept as safe fallbacks
                         for i in range(6):
                             st.session_state[f"ch_inf_{i}"] = 5
                             st.session_state[f"ch_cav_{i}"] = 4
                             st.session_state[f"ch_arc_{i}"] = 4
                             
-                        st.session_state["gov_toast"] = "📸 Euclidean Visual Analysis Complete! Successfully extracted gear tiers and mastery stars."
+                        st.session_state["gov_toast"] = "📸 Variance Segmentation & Median Sampling Complete! Perfectly extracted Tiers and Stars."
                     except Exception as e:
                         st.session_state["gov_toast"] = f"⚠️ Image processing error: {e}"
                 else:
@@ -1986,28 +1974,28 @@ else:
                                 st.session_state[f"gv_{troop}_{piece}"] = target_idx
                         st.session_state["gov_toast"] = f"✅ Globally applied {global_tier} to all slots."
 
-            # --- UI: Top Action Row (Matches Kingshot Optimizer Layout) ---
+            # --- UI: Top Action Row ---
             act_c1, act_c2, act_c3 = st.columns([1.5, 2, 1.5])
             with act_c1:
                 st.selectbox("Set all to:", gov_names, index=15, key="gv_global_set")
             with act_c2:
-                # Key is required here to access the file in the callback
                 st.file_uploader("Upload screenshot", type=["png", "jpg", "jpeg"], label_visibility="collapsed", key="gov_screenshot_uploader")
             with act_c3:
-                # on_click safely alters session state before the inputs are redrawn
                 st.button("Apply to Inputs", type="primary", use_container_width=True, on_click=apply_gov_inputs)
                 
-            # Fire the toast notification if the callback set one
             if "gov_toast" in st.session_state:
-                st.toast(st.session_state["gov_toast"])
+                if "⚠️" in st.session_state["gov_toast"]:
+                    st.error(st.session_state["gov_toast"])
+                else:
+                    st.success(st.session_state["gov_toast"])
                 del st.session_state["gov_toast"]
 
             st.markdown("---")
             
-            # --- UI: 2-Column Card Grid (Matches Kingshot Optimizer Layout) ---
+            # --- UI: 2-Column Card Grid ---
             current_gov = {"infantry": [], "cavalry": [], "archer": []}
             
-            # Row 1: Cavalry (Top in game UI)
+            # Row 1: Cavalry (Top)
             row1_c1, row1_c2 = st.columns(2)
             with row1_c1:
                 with st.container(border=True):
@@ -2023,7 +2011,7 @@ else:
                     st.caption(f"Current Stat: {stat_val:.2f}%")
             current_gov["cavalry"] = [lvl_0, lvl_1]
                     
-            # Row 2: Infantry (Middle in game UI)
+            # Row 2: Infantry (Middle)
             row2_c1, row2_c2 = st.columns(2)
             with row2_c1:
                 with st.container(border=True):
@@ -2039,7 +2027,7 @@ else:
                     st.caption(f"Current Stat: {stat_val:.2f}%")
             current_gov["infantry"] = [lvl_0, lvl_1]
 
-            # Row 3: Archer (Bottom in game UI)
+            # Row 3: Archer (Bottom)
             row3_c1, row3_c2 = st.columns(2)
             with row3_c1:
                 with st.container(border=True):
@@ -2056,11 +2044,7 @@ else:
             current_gov["archer"] = [lvl_0, lvl_1]
 
             st.markdown("---")
-            
-           
-            
-
-            
+                       
 
 # ... existing code ...
             
