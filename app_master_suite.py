@@ -1842,7 +1842,7 @@ else:
             def apply_gov_inputs():
                 """
                 Callback function executed BEFORE the UI renders.
-                Prevents StreamlitAPIException and handles the image processing pipeline.
+                Implements a custom PIL + EasyOCR computer vision pipeline.
                 """
                 from PIL import Image
                 import numpy as np
@@ -1850,36 +1850,81 @@ else:
                 # Check if a screenshot was uploaded
                 if st.session_state.get("gov_screenshot_uploader") is not None:
                     try:
-                        # 1. Start the image processing pipeline
+                        # 1. Fetch our globally cached EasyOCR reader and process the image
+                        reader = load_ocr_reader()
                         img = Image.open(st.session_state["gov_screenshot_uploader"]).convert('RGB')
-                        width, height = img.size
+                        img_np = np.array(img)
+                        h, w = img_np.shape[:2]
                         
-                        # 2. Define relative coordinate bounding boxes for the 6 gear pieces
-                        # Layout: Top (Cav), Middle (Inf), Bottom (Arc)
+                        # 2. Define relative coordinate bounding boxes based on the mobile layout
+                        # Dictionary maps: [Y_start, Y_end, X_start, X_end] as percentages
                         bboxes = {
-                            "cav": [(0.15, 0.20, 0.35, 0.35), (0.65, 0.20, 0.85, 0.35)],
-                            "inf": [(0.15, 0.40, 0.35, 0.55), (0.65, 0.40, 0.85, 0.55)],
-                            "arc": [(0.15, 0.60, 0.35, 0.75), (0.65, 0.60, 0.85, 0.75)]
+                            "cav": {"0": (0.20, 0.32, 0.15, 0.38), "1": (0.20, 0.32, 0.62, 0.85)},
+                            "inf": {"0": (0.45, 0.57, 0.15, 0.38), "1": (0.45, 0.57, 0.62, 0.85)},
+                            "arc": {"0": (0.68, 0.80, 0.15, 0.38), "1": (0.68, 0.80, 0.62, 0.85)}
                         }
                         
-                        # 3. Future Step: Crop boxes, sample background color to detect Tier (Green/Blue/Purple/Gold/Red)
-                        # and count yellow star pixels to determine Mastery level.
-                        # For now, we simulate a successful extraction (Gold 1★)
-                        target_idx = 16 
-                        
-                        for troop in ['inf', 'cav', 'arc']:
-                            for piece in [0, 1]:
-                                st.session_state[f"gv_{troop}_{piece}"] = target_idx
+                        for troop in ['cav', 'inf', 'arc']:
+                            for piece in ["0", "1"]:
+                                y1, y2, x1, x2 = bboxes[troop][piece]
                                 
-                        # Charms - Mapping simulated shapes from the image
-                        for i in range(6):
-                            st.session_state[f"ch_inf_{i}"] = 5
-                            st.session_state[f"ch_cav_{i}"] = 4
-                            st.session_state[f"ch_arc_{i}"] = 4
-                            
-                        st.session_state["gov_toast"] = "📸 Image processed! Bounding boxes analyzed. Extracted Gold 1★ and mapped Charm shapes."
+                                # Crop the specific gear piece and the charms strip directly below it
+                                gear_crop = img_np[int(y1*h):int(y2*h), int(x1*w):int(x2*w)]
+                                charm_crop = img_np[int(y2*h):int((y2+0.05)*h), int(x1*w):int(x2*w)]
+                                
+                                # --- STEP A: DETECT GEAR TIER VIA RGB SAMPLING ---
+                                # Sample the top-left corner to get the pure background color
+                                corner = gear_crop[0:15, 0:15] 
+                                r, g, b = corner.mean(axis=(0,1))
+                                
+                                tier = "Gold" # Safe default
+                                if r > 160 and g < 100 and b < 100: tier = "Red"
+                                elif r > 150 and g > 120 and b < 100: tier = "Gold"
+                                elif r > 100 and g < 100 and b > 130: tier = "Purple"
+                                elif b > 130 and r < 100: tier = "Blue"
+                                elif g > 130 and r < 130 and b < 130: tier = "Green"
+                                
+                                # --- STEP B: DETECT MASTERY VIA YELLOW PIXEL DENSITY ---
+                                # Crop the bottom-left quadrant where the stars are located
+                                gh, gw = gear_crop.shape[:2]
+                                bl_corner = gear_crop[int(gh*0.6):, 0:int(gw*0.5)]
+                                # Identify yellow pixels (High Red & Green, Low Blue)
+                                yellow_mask = (bl_corner[:,:,0] > 180) & (bl_corner[:,:,1] > 150) & (bl_corner[:,:,2] < 100)
+                                yellow_pixels = np.sum(yellow_mask)
+                                
+                                stars = 0
+                                if yellow_pixels > 200: stars = 3
+                                elif yellow_pixels > 100: stars = 2
+                                elif yellow_pixels > 30: stars = 1
+                                
+                                # Construct the string and map it to the exact index in your atlas
+                                target_name = f"{tier} {stars}★"
+                                if target_name in gov_names:
+                                    st.session_state[f"gv_{troop}_{piece}"] = gov_names.index(target_name)
+                                    
+                                # --- STEP C: OCR CHARM EXTRACTION ---
+                                # Feed the cropped strip to EasyOCR looking strictly for numbers
+                                results = reader.readtext(charm_crop, allowlist='0123456789')
+                                results.sort(key=lambda x: x[0][0][0]) # Sort Left to Right physically
+                                
+                                charm_lvls = []
+                                for bbox_res, text, prob in results:
+                                    if text.isdigit() and 0 <= int(text) <= 22:
+                                        charm_lvls.append(int(text))
+                                
+                                # If the image is blurry and OCR misses a charm, pad it with a safe default
+                                while len(charm_lvls) < 3:
+                                    charm_lvls.append(4) 
+                                    
+                                # Route the 3 charm levels into the 6 available slots per troop type
+                                offset = 0 if piece == "0" else 3
+                                st.session_state[f"ch_{troop}_{offset}"] = charm_lvls[0]
+                                st.session_state[f"ch_{troop}_{offset+1}"] = charm_lvls[1]
+                                st.session_state[f"ch_{troop}_{offset+2}"] = charm_lvls[2]
+
+                        st.session_state["gov_toast"] = "📸 Computer Vision extraction complete! Successfully mapped Tier colors, Mastery stars, and Charm layouts."
                     except Exception as e:
-                        st.session_state["gov_toast"] = f"⚠️ Error processing image: {e}"
+                        st.session_state["gov_toast"] = f"⚠️ Image processing error: {e}"
                 else:
                     # GLOBAL DROPDOWN APPLY
                     global_tier = st.session_state.get("gv_global_set")
@@ -1958,7 +2003,11 @@ else:
                     stat_val = sum(gov_atlas["deltas"][:lvl_1+1])
                     st.caption(f"Current Stat: {stat_val:.2f}%")
             current_gov["archer"] = [lvl_0, lvl_1]
+
             st.markdown("---")
+            
+
+# ... existing code ...
             
             if st.button("🚀 Execute Governor Matrix Optimization", type="primary", use_container_width=True, key="gv_run_btn"):
                 gv_progress = st.progress(0)
