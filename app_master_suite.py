@@ -1842,94 +1842,101 @@ else:
             def apply_gov_inputs():
                 """
                 Callback function executed BEFORE the UI renders.
-                Implements a robust Row Variance Segmenter and Median Edge Sampler.
+                Implements an enterprise-grade OpenCV (HSV) Contour detection pipeline.
                 """
-                from PIL import Image
+                import cv2
                 import numpy as np
+                from PIL import Image
                 
                 if st.session_state.get("gov_screenshot_uploader") is not None:
                     try:
-                        img = Image.open(st.session_state["gov_screenshot_uploader"]).convert('RGB')
-                        img_np = np.array(img)
+                        # 1. Load image and convert to OpenCV format (RGB)
+                        img_pil = Image.open(st.session_state["gov_screenshot_uploader"]).convert('RGB')
+                        img_np = np.array(img_pil)
                         h, w = img_np.shape[:2]
                         
-                        def analyze_item_crop(item_crop):
-                            """Extracts Tier via Median Edge Sampling and Stars via Blob Counting."""
-                            bh, bw = item_crop.shape[:2]
+                        def analyze_item_crop_cv2(item_crop):
+                            """Uses HSV masking and Contour tracking to extract Tiers and Stars perfectly."""
+                            # Convert crop to HSV color space
+                            hsv_crop = cv2.cvtColor(item_crop, cv2.COLOR_RGB2HSV)
                             
-                            # 1. TIER DETECTION (Median Edge Sampling)
-                            # Sample top edge and left edge to avoid the center item and the top-right red dot
-                            top_edge = item_crop[int(bh*0.05):int(bh*0.20), int(bw*0.20):int(bw*0.60)].reshape(-1, 3)
-                            left_edge = item_crop[int(bh*0.20):int(bh*0.60), int(bw*0.05):int(bw*0.20)].reshape(-1, 3)
-                            edges = np.vstack([top_edge, left_edge])
-                            
-                            # Median completely ignores stray pixels from the item overlap
-                            median_color = np.median(edges, axis=0)
-                            
-                            # Calibrated Tier Centers for Kingshot
-                            centers = {
-                                "Red": np.array([210, 50, 50]),
-                                "Gold": np.array([220, 140, 40]), # Orange-yellow background
-                                "Purple": np.array([150, 80, 190]),
-                                "Blue": np.array([60, 130, 210]),
-                                "Green": np.array([90, 170, 70])
+                            # --- 1. TIER DETECTION (HSV) ---
+                            # Define strict Hue ranges for Kingshot gear tiers
+                            # OpenCV Hue goes from 0-179.
+                            color_bounds = {
+                                "Red":    [([0, 100, 100], [10, 255, 255]), ([160, 100, 100], [179, 255, 255])], # Red wraps around 0/180
+                                "Gold":   [([15, 100, 100], [35, 255, 255])],
+                                "Green":  [([40, 50, 50], [85, 255, 255])],
+                                "Blue":   [([90, 100, 100], [130, 255, 255])],
+                                "Purple": [([135, 50, 50], [155, 255, 255])]
                             }
                             
-                            best_tier = "Gold"
-                            min_dist = float('inf')
-                            for tier, center in centers.items():
-                                dist = np.linalg.norm(median_color - center)
-                                if dist < min_dist:
-                                    min_dist = dist
-                                    best_tier = tier
-
-                            # 2. MASTERY STAR DETECTION (Blob Counting)
-                            bottom_region = item_crop[int(bh*0.65):, :]
-                            sr, sg, sb = bottom_region[:,:,0].astype(int), bottom_region[:,:,1].astype(int), bottom_region[:,:,2].astype(int)
+                            tier_scores = {}
+                            for tier, bounds_list in color_bounds.items():
+                                mask = np.zeros(hsv_crop.shape[:2], dtype=np.uint8)
+                                for (lower, upper) in bounds_list:
+                                    lower_np = np.array(lower, dtype=np.uint8)
+                                    upper_np = np.array(upper, dtype=np.uint8)
+                                    mask = cv2.bitwise_or(mask, cv2.inRange(hsv_crop, lower_np, upper_np))
+                                tier_scores[tier] = cv2.countNonZero(mask)
+                                
+                            best_tier = max(tier_scores, key=tier_scores.get)
+                            if tier_scores[best_tier] < 50: best_tier = "Gold" # Fallback if unrecognizable
                             
-                            # Strict yellow mask: R & G must be high, B must be low, AND G must be > 170 to ignore Gold backgrounds
-                            yellow = (sr > 190) & (sg > 170) & (sb < 100)
+                            # --- 2. STAR DETECTION (CONTOURS) ---
+                            # Isolate bottom 40% where stars live
+                            ch, cw = hsv_crop.shape[:2]
+                            bottom_hsv = hsv_crop[int(ch*0.6):, :]
                             
-                            col_sums = yellow.sum(axis=0)
-                            active_cols = np.where(col_sums >= 2)[0]
+                            # Strict bright yellow mask for stars
+                            lower_yellow = np.array([20, 150, 150], dtype=np.uint8)
+                            upper_yellow = np.array([35, 255, 255], dtype=np.uint8)
+                            star_mask = cv2.inRange(bottom_hsv, lower_yellow, upper_yellow)
+                            
+                            # Use OpenCV to find distinct shapes (contours) in the yellow mask
+                            contours, _ = cv2.findContours(star_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
                             
                             stars = 0
-                            if len(active_cols) > 0:
-                                # Split into contiguous blobs if gap is > 4 pixels
-                                blobs = np.split(active_cols, np.where(np.diff(active_cols) > 4)[0] + 1)
-                                # Only count a star if the blob is at least 3 pixels wide (ignores noise)
-                                stars = sum(1 for blob in blobs if len(blob) >= 3)
-                            
+                            for contour in contours:
+                                area = cv2.contourArea(contour)
+                                # Filter out random noise specks; a real star will have some area
+                                if area > (cw * ch * 0.001): 
+                                    stars += 1
+                                    
                             return best_tier, min(stars, 3)
 
-                        def process_column(side):
-                            """Isolates gear boxes using horizontal row variance to ignore the sky."""
-                            x1 = int(w * 0.05) if side == "left" else int(w * 0.65)
-                            x2 = int(w * 0.35) if side == "left" else int(w * 0.95)
-                            col_img = img_np[:, x1:x2]
+                        def process_column_cv2(side):
+                            """Finds the 3 vertical gear boxes using grayscale thresholding."""
+                            x1 = int(w * 0.05) if side == "left" else int(w * 0.55)
+                            x2 = int(w * 0.45) if side == "left" else int(w * 0.95)
+                            y1, y2 = int(h * 0.15), int(h * 0.85)
                             
-                            # Convert to grayscale to check for activity/busyness
-                            gray = np.dot(col_img[...,:3], [0.2989, 0.5870, 0.1140])
+                            col_img = img_np[y1:y2, x1:x2]
                             
-                            # The sky is a smooth gradient (variance ~0). Gear boxes have high variance.
-                            row_std = np.std(gray, axis=1)
-                            active_rows = np.where(row_std > 10)[0]
+                            # Convert to grayscale and apply an edge-detection-like threshold
+                            gray = cv2.cvtColor(col_img, cv2.COLOR_RGB2GRAY)
+                            _, thresh = cv2.threshold(gray, 50, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)
+                            
+                            # Horizontal projection to find blocks of high activity (gear boxes)
+                            y_density = np.sum(thresh == 255, axis=1)
+                            active_rows = np.where(y_density > (x2-x1)*0.2)[0]
                             
                             if len(active_rows) == 0:
                                 return [("Gold", 0)] * 3
                                 
-                            # Split rows into discrete gear box segments (gap > 3% of screen height)
-                            segments = np.split(active_rows, np.where(np.diff(active_rows) > int(h * 0.03))[0] + 1)
+                            # Split into blocks where gaps are larger than 3% of height
+                            gap_size = int(h * 0.03)
+                            segments = np.split(active_rows, np.where(np.diff(active_rows) > gap_size)[0] + 1)
                             
-                            # Filter out tiny noise segments and grab the 3 largest
-                            segments = [seg for seg in segments if len(seg) > int(h * 0.04)]
+                            # Filter small noise and take the top 3 biggest blocks
+                            segments = [seg for seg in segments if len(seg) > int(h * 0.05)]
                             segments = sorted(segments, key=len, reverse=True)[:3]
-                            segments = sorted(segments, key=lambda s: s[0]) # Sort Top to Bottom
+                            segments = sorted(segments, key=lambda s: s[0])
                             
                             results = []
                             for seg in segments:
                                 item_crop = col_img[seg[0]:seg[-1], :]
-                                tier, stars = analyze_item_crop(item_crop)
+                                tier, stars = analyze_item_crop_cv2(item_crop)
                                 results.append((tier, stars))
                                 
                             while len(results) < 3:
@@ -1937,16 +1944,16 @@ else:
                                 
                             return results
                         
-                        # Execute the pipelines for Left and Right gear columns
-                        left_res = process_column("left")
-                        right_res = process_column("right")
+                        # Process both columns with OpenCV
+                        left_res = process_column_cv2("left")
+                        right_res = process_column_cv2("right")
                         
                         def set_tier(troop, piece_idx, res_tuple):
                             t_name = f"{res_tuple[0]} {res_tuple[1]}★"
                             if t_name in gov_names:
                                 st.session_state[f"gv_{troop}_{piece_idx}"] = gov_names.index(t_name)
                         
-                        # Apply to session state mapping
+                        # Top = Cavalry, Mid = Infantry, Bottom = Archer
                         set_tier("cav", 0, left_res[0])
                         set_tier("inf", 0, left_res[1])
                         set_tier("arc", 0, left_res[2])
@@ -1955,13 +1962,13 @@ else:
                         set_tier("inf", 1, right_res[1])
                         set_tier("arc", 1, right_res[2])
                         
-                        # Charms - Kept as safe fallbacks
+                        # Charms - Keep fallbacks
                         for i in range(6):
                             st.session_state[f"ch_inf_{i}"] = 5
                             st.session_state[f"ch_cav_{i}"] = 4
                             st.session_state[f"ch_arc_{i}"] = 4
                             
-                        st.session_state["gov_toast"] = "📸 Variance Segmentation & Median Sampling Complete! Perfectly extracted Tiers and Stars."
+                        st.session_state["gov_toast"] = "📸 OpenCV Contour Analysis Complete! Resilient HSV mapping applied."
                     except Exception as e:
                         st.session_state["gov_toast"] = f"⚠️ Image processing error: {e}"
                 else:
