@@ -259,7 +259,7 @@ def kingshot_multirally_sim2(rally_waves, garrison, max_rounds=200):
         eff_d_stats[:, 0] *= max(0.1, d_mods.atk - a_mods.enemy_atk_down)
         eff_d_stats[:, 1] *= d_mods.def_val * garrison_fortification
         eff_d_stats[:, 2] *= max(0.1, d_mods.leth - a_mods.enemy_leth_down)
-        eff_d_stats[:, 3] *= d_mods.hp * garrison_fortification
+        eff_d_stats[:, 3] *= d_mods.hp 
         
         a_troops = np.copy(attacker.troops)
         d_troops = np.copy(current_garrison.troops)
