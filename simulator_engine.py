@@ -308,25 +308,7 @@ def kingshot_multirally_sim2(rally_waves, garrison, max_rounds=200):
                     elif eff == 'enemy_taken_up': a_taken_mult += (proc['val'] - 1.0)
                     elif eff == 'dmg_reduction': d_reduct_proc += proc['val']
             
-            final_a_reduct = max(0.1, a_mods.reduct - a_reduct_proc)
-            final_d_reduct = max(0.1, d_mods.reduct - d_reduct_proc)
-            
-            d_loss_pool = np.zeros(3)
-            for idx in range(3):
-                if a_troops[idx] <= 0: continue
-                base_power = np.sqrt(a_troops[idx]) * (eff_a_stats[idx, 0] * round_a_atk_mult) * eff_a_stats[idx, 2] * round_a_dmg_mult
-                if idx in [0, 2]: t_pos = a_frontline
-                else: t_pos = 2 if (d_troops[2] > 0 and np.random.rand() < cav_backline_split) else a_frontline
-                if t_pos is None or d_troops[t_pos] <= 0: continue
-                squad_power = base_power * counter_matrix[idx, t_pos]
-                if np.random.rand() < d_mods.dodge: squad_power *= 0.5
-                losses = (squad_power / (eff_d_stats[t_pos, 1] * eff_d_stats[t_pos, 3])) * final_d_reduct * combat_scale * d_taken_mult * d_shield_mult[t_pos]
-                d_loss_pool[t_pos] += losses
-                
-            a_loss_pool = np.zeros(3)
-            for idx in range(3):
-                if d_troops[idx] <= 0: continue
-                base_power = np.sqrt(d_troops[idx]) * (eff_d_stats[idx, 0] * round_d_atk_mult) * eff_d_stats[idx, 2] * round_d_dmg_mult
+                    last_round_run = 0
                 if idx in [0, 2]: t_pos = d_frontline
                 else: t_pos = 2 if (a_troops[2] > 0 and np.random.rand() < cav_backline_split) else d_frontline
                 if t_pos is None or a_troops[t_pos] <= 0: continue
