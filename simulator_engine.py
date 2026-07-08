@@ -64,10 +64,36 @@ class CombatMods:
         self.reduct = 1.0
         self.dodge = 0.0
         self.enemy_leth_down = 0.0
+        self.enemy_atk_down = 0.0  # <--- Added this!
         self.enemy_dmg_down = 0.0
         self.enemy_taken_up = 0.0
         self.procs = []
-
+def apply_skill(skill, mods):
+    if isinstance(skill, list):
+        for sub_skill in skill:
+            mods = apply_skill(sub_skill, mods)
+        return mods
+        
+    sk_type = skill.get('type')
+    val = skill.get('val', 0.0)
+    
+    # Use getattr/setattr or a simple map for safety
+    if hasattr(mods, sk_type):
+        current_val = getattr(mods, sk_type)
+        if sk_type in ['atk', 'def_val', 'leth', 'health', 'dmg']:
+            setattr(mods, sk_type, current_val + val)
+        elif sk_type in ['enemy_leth_down', 'enemy_atk_down', 'enemy_taken_up']:
+            setattr(mods, sk_type, current_val + val)
+            
+    # Keep the original logic for complex/multiplicative interactions
+    elif sk_type == 'dmg_reduction':   mods.reduct *= (1.0 - val)
+    elif sk_type == 'enemy_dmg_down':  mods.enemy_dmg_down = 1.0 - ((1.0 - mods.enemy_dmg_down) * (1.0 - val))
+    elif sk_type in ['dodge', 'dodge_chance']: 
+        mods.dodge = 1.0 - ((1.0 - mods.dodge) * (1.0 - val))
+    elif sk_type == 'proc':            mods.procs.append(skill)
+    elif sk_type == 'timed_shield':    mods.procs.append(skill)
+    # ... rest of your class_dmg/class_atk logic remains the same
+    return mods
 # =========================================================================
 # --- DATA MANAGEMENT UTILITIES ---
 # =========================================================================
