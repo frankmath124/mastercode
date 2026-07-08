@@ -247,10 +247,10 @@ def kingshot_multirally_sim2(rally_waves, garrison, max_rounds=200):
             if hero_name and hero_name != "None" and hero_name in hero_db:
                 d_mods = apply_skill(hero_db[hero_name]['skill1'], d_mods)
                 
-        true_base_stats = np.array([[10.0, 30.0, 10.0, 30.0], [30.0, 10.0, 30.0, 10.0], [40.0, 7.5, 40.0, 7.5]])
-        eff_a_stats = true_base_stats * (1.0 + attacker.stats / 100.0)
-        eff_d_stats = true_base_stats * (1.0 + current_garrison.stats / 100.0)
+        eff_a_stats = np.copy(attacker.stats)
+        eff_d_stats = np.copy(current_garrison.stats)
         
+        # The dynamic combat modifiers (skills/debuffs) will then apply cleanly to the true absolute stats:
         eff_a_stats[:, 0] *= max(0.1, a_mods.atk - d_mods.enemy_atk_down)
         eff_a_stats[:, 1] *= a_mods.def_val
         eff_a_stats[:, 2] *= max(0.1, a_mods.leth - d_mods.enemy_leth_down)
