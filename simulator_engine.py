@@ -82,40 +82,38 @@ class CombatMods:
     def __getattr__(self, name):
         return 0.0 
 
-def apply_skill(skill, mods):
+# 1. Inside apply_skill(skill, mods, include_static_stats=False):
+def apply_skill(skill, mods, include_static_stats=False):
     if isinstance(skill, list):
         for sub_skill in skill:
-            mods = apply_skill(sub_skill, mods)
+            mods = apply_skill(sub_skill, mods, include_static_stats)
         return mods
         
     sk_type = skill.get('type')
     val = skill.get('val', 0.0)
     
-    # 1. Handle standard stats (Additive)
-    if sk_type == 'atk':               mods.atk += val
-    elif sk_type == 'defense':         mods.def_val += val
-    elif sk_type == 'lethality':       mods.leth += val
-    elif sk_type == 'health':          mods.hp += val
-    elif sk_type == 'dmg':             mods.dmg += val
-    elif sk_type == 'enemy_leth_down': mods.enemy_leth_down += val
-    elif sk_type == 'enemy_atk_down':  mods.enemy_atk_down += val
-    elif sk_type == 'enemy_taken_up':  mods.enemy_taken_up += val
-    
-    # 2. Handle Multiplicative Mitigations
-    elif sk_type == 'dmg_reduction':   mods.reduct *= (1.0 - val)
-    elif sk_type == 'enemy_dmg_down':  mods.enemy_dmg_down = 1.0 - ((1.0 - mods.enemy_dmg_down) * (1.0 - val))
+    # Static stats (Atk/Def/Leth/HP) are ALREADY baked into Battle Report % numbers!
+    # Only add them if we are building stats from raw gear rather than a Battle Report.
+    if include_static_stats:
+        if sk_type == 'atk':               mods.atk += val
+        elif sk_type == 'defense':         mods.def_val += val
+        elif sk_type == 'lethality':       mods.leth += val
+        elif sk_type == 'health':          mods.hp += val
+        elif sk_type == 'class_atk_buff':  mods.class_atk_mod[skill.get('target_class', 0)] += val
+
+    # Combat-phase multipliers & procs (NOT shown in Battle Report stat % bars):
+    if sk_type == 'dmg':                   mods.dmg += val
+    elif sk_type == 'enemy_leth_down':     mods.enemy_leth_down += val
+    elif sk_type == 'enemy_atk_down':      mods.enemy_atk_down += val
+    elif sk_type == 'enemy_taken_up':      mods.enemy_taken_up += val
+    elif sk_type == 'dmg_reduction':       mods.reduct *= (1.0 - val)
+    elif sk_type == 'enemy_dmg_down':      mods.enemy_dmg_down = 1.0 - ((1.0 - mods.enemy_dmg_down) * (1.0 - val))
     elif sk_type in ['dodge', 'dodge_chance']: 
         mods.dodge = 1.0 - ((1.0 - mods.dodge) * (1.0 - val))
-        
-    # 3. Handle Special/Proc Mechanics
     elif sk_type in ['proc', 'timed_shield']:
         mods.procs.append(skill)
-        
     elif sk_type == 'class_dmg_buff':
         mods.class_dmg += np.array(skill.get('buffs', [0, 0, 0]))
-        
-    elif sk_type == 'class_atk_buff':
-        mods.class_atk_mod[skill.get('target_class', 0)] += val
         
     return mods
 
@@ -242,7 +240,7 @@ def load_hero_db():
 def kingshot_multirally_sim2(rally_waves, garrison, max_rounds=200):
     combat_scale = 8.0
     cav_backline_split = 0.20
-    garrison_fortification = 1.38
+    garrison_fortification = 1.0
     
     hero_db = load_hero_db()
     current_garrison = garrison.clone()
