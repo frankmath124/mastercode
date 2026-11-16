@@ -71,58 +71,55 @@ class TroopSide:
         return copy.deepcopy(self)
 
 # =========================================================================
-# --- HERO DATABASE (GEN 1-5 + GEN 5 ADDITIONS: LONG FEI, VIVIAN, THRUD) ---
+# --- HERO DATABASE (FIXED VIVIAN PROC PARSING) ---
 # =========================================================================
 def load_hero_db():
     db = {}
-    # Gen 1
+    # Gen 1-4
     db['Amadeus'] = {'skill1': {'type': 'lethality', 'val': 0.25}, 'skill2': {'type': 'atk', 'val': 0.25}, 'skill3': {'type': 'proc', 'chance': 0.40, 'effect': 'dmg', 'val': 1.50}, 'widget': {'has_widget': True, 'scenario': 'rally', 'type': 'atk', 'val': 0.15}}
     db['Helga'] = {'skill1': {'type': 'proc', 'chance': 0.40, 'effect': 'dmg_reduction', 'val': 0.50}, 'skill2': {'type': 'atk', 'val': 0.25}, 'skill3': {'type': 'lethality', 'val': 0.25}, 'widget': {'has_widget': True, 'scenario': 'rally', 'type': 'lethality', 'val': 0.15}}
     db['Saul'] = {'skill1': [{'type': 'health', 'val': 0.15}, {'type': 'defense', 'val': 0.10}], 'skill2': {'type': 'dmg_reduction', 'val': 0.0}, 'skill3': {'type': 'lethality', 'val': 0.25}, 'widget': {'has_widget': True, 'scenario': 'garrison', 'type': 'atk', 'val': 0.15}}
     db['Jabel'] = {'skill1': {'type': 'proc', 'chance': 0.50, 'effect': 'dmg_reduction', 'val': 0.40}, 'skill2': {'type': 'proc', 'chance': 0.50, 'effect': 'dmg', 'val': 1.50}, 'skill3': {'type': 'dmg', 'val': 0.25}, 'widget': {'has_widget': True, 'scenario': 'rally', 'type': 'lethality', 'val': 0.15}}
     
-    # Gen 2
     db['Zoe'] = {'skill1': {'type': 'proc', 'chance': 0.40, 'effect': 'dmg', 'val': 1.40}, 'skill2': {'type': 'atk', 'val': 0.25}, 'skill3': {'type': 'proc', 'chance': 0.50, 'effect': 'enemy_taken_up', 'val': 1.50}, 'widget': {'has_widget': True, 'scenario': 'garrison', 'type': 'atk', 'val': 0.10}}
     db['Marlin'] = {'skill1': {'type': 'proc', 'chance': 0.50, 'effect': 'dmg', 'val': 1.50}, 'skill2': {'type': 'proc', 'chance': 0.20, 'effect': 'enemy_leth_down', 'val': 0.50, 'duration': 2}, 'skill3': {'type': 'proc', 'chance': 0.50, 'effect': 'dmg', 'val': 1.50}, 'widget': {'has_widget': True, 'scenario': 'rally', 'type': 'lethality', 'val': 0.15}}
     db['Hilde'] = {'skill1': [{'type': 'atk', 'val': 0.15}, {'type': 'defense', 'val': 0.10}], 'skill2': {'type': 'proc', 'chance': 0.25, 'effect': 'dmg', 'val': 2.00}, 'skill3': {'type': 'proc', 'chance': 0.40, 'effect': 'dmg_reduction', 'val': 0.50}, 'widget': {'has_widget': True, 'scenario': 'garrison', 'type': 'dodge', 'val': 0.05}}
     
-    # Gen 3
     db['Petra'] = {'skill1': {'type': 'proc', 'chance': 0.50, 'effect': 'enemy_taken_up', 'val': 1.50}, 'skill2': {'type': 'proc', 'chance': 0.50, 'effect': 'atk', 'val': 1.50}, 'skill3': {'type': 'proc', 'chance': 0.50, 'effect': 'dmg_reduction', 'val': 0.50}, 'widget': {'has_widget': True, 'scenario': 'rally', 'type': 'atk', 'val': 0.15}}
     db['Eric'] = {'skill1': {'type': 'enemy_atk_down', 'val': 0.20}, 'skill2': {'type': 'dmg_reduction', 'val': 0.20}, 'skill3': {'type': 'health', 'val': 0.25}, 'widget': {'has_widget': True, 'scenario': 'garrison', 'type': 'defense', 'val': 0.15}}
     db['Jaegar'] = {'skill1': {'type': 'proc', 'chance': 0.20, 'effect': 'dmg', 'val': 1.40}, 'skill2': {'type': 'proc', 'chance': 0.20, 'effect': 'enemy_leth_down', 'val': 0.50, 'duration': 2}, 'skill3': {'type': 'health', 'val': 0.25}, 'widget': {'has_widget': True, 'scenario': 'rally', 'type': 'health', 'val': 0.15}}
     
-    # Gen 4
     db['Alcar'] = {'skill1': {'type': 'timed_shield', 'interval': 5, 'duration': 2, 'val': 0.70, 'targets': [0, 2]}, 'skill2': {'type': 'class_dmg_buff', 'buffs': [1.00, 0.10, 0.10]}, 'skill3': [{'type': 'class_dmg_buff', 'buffs': [0.60, 0.0, 0.0]}, {'type': 'enemy_taken_up', 'val': 0.25}], 'widget': {'has_widget': True, 'scenario': 'garrison', 'type': 'health', 'val': 0.15}}
     db['Rosa'] = {'skill1': {'type': 'proc', 'chance': 0.40, 'effect': 'dmg', 'val': 1.50}, 'skill2': {'type': 'enemy_dmg_down', 'val': 0.20}, 'skill3': {'type': 'class_atk_buff', 'target_class': 2, 'val': 0.30}, 'widget': {'has_widget': True, 'scenario': 'rally', 'type': 'lethality', 'val': 0.15}}
     db['Margot'] = {'skill1': {'type': 'atk', 'val': 0.25}, 'skill2': {'type': 'dodge_chance', 'val': 0.20}, 'skill3': {'type': 'proc', 'chance': 0.25, 'effect': 'double_strike', 'val': 2.00}, 'widget': {'has_widget': True, 'scenario': 'garrison', 'type': 'lethality', 'val': 0.15}}
 
-    # Gen 5 Additions: Long Fei, Vivian, Thrud[cite: 13, 14, 15]
+    # Gen 5: Long Fei, Vivian, Thrud[cite: 13, 14, 15]
     db['Long Fei'] = {
-        'skill1': {'type': 'proc', 'chance': 0.40, 'effect': 'dmg_reduction', 'val': 0.50}, # 40% chance to reduce damage by 50%[cite: 14]
-        'skill2': {'type': 'defense', 'val': 0.25},                                      # Flat +25% Defense[cite: 14]
-        'skill3': {'type': 'proc', 'chance': 0.25, 'effect': 'dmg', 'val': 2.00},         # 25% chance to deal 200% damage[cite: 14]
-        'widget': {'has_widget': True, 'scenario': 'garrison', 'type': 'atk', 'val': 0.15} # +15% Attack when garrisoned
+        'skill1': {'type': 'proc', 'chance': 0.40, 'effect': 'dmg_reduction', 'val': 0.50},
+        'skill2': {'type': 'defense', 'val': 0.25},
+        'skill3': {'type': 'proc', 'chance': 0.25, 'effect': 'dmg', 'val': 2.00},
+        'widget': {'has_widget': True, 'scenario': 'garrison', 'type': 'atk', 'val': 0.15}
     }
     db['Vivian'] = {
-        'skill1': {'type': 'enemy_taken_up', 'val': 0.25},                               # Permanent +25% Enemy Damage Taken Up[cite: 13]
+        'skill1': {'type': 'enemy_taken_up', 'val': 0.25},                               # Permanent +25% Damage Taken[cite: 13]
         'skill2': [
-            {'type': 'periodic_proc', 'interval': 4, 'effect': 'dmg', 'val': 2.00},      # Every 4 attacks: 100% extra damage[cite: 13]
-            {'type': 'periodic_proc', 'interval': 4, 'effect': 'enemy_taken_up', 'val': 0.15} # Target's next attack takes +15% damage[cite: 13]
+            {'type': 'periodic_proc', 'interval': 4, 'effect': 'dmg', 'val': 2.00},      # Every 4 attacks: +100% extra damage (val = 2.00x)[cite: 13]
+            {'type': 'periodic_proc', 'interval': 4, 'effect': 'enemy_taken_up', 'val': 0.15} # Target takes +15% extra damage[cite: 13]
         ],
-        'skill3': {'type': 'periodic_proc', 'interval': 4, 'target_class': 2, 'effect': 'dmg', 'val': 1.60}, # Every 4 attacks: Archers deal +60% extra damage[cite: 13]
-        'widget': {'has_widget': True, 'scenario': 'rally', 'type': 'defense', 'val': 0.15} # +15% Defense when in Defensive Stance / Rally
+        'skill3': {'type': 'periodic_proc', 'interval': 4, 'target_class': 2, 'effect': 'dmg', 'val': 1.60}, # Archers deal +60% extra damage[cite: 13]
+        'widget': {'has_widget': True, 'scenario': 'rally', 'type': 'defense', 'val': 0.15}
     }
     db['Thrud'] = {
         'skill1': [
-            {'type': 'dmg_reduction', 'val': 0.15},                                     # Reduces damage taken by 15%[cite: 15]
-            {'type': 'class_dmg_buff', 'buffs': [0.15, 0.0, 0.15]}                      # Increases Infantry (0) and Archers/Lancers (2) damage by 15%[cite: 15]
+            {'type': 'dmg_reduction', 'val': 0.15},
+            {'type': 'class_dmg_buff', 'buffs': [0.15, 0.0, 0.15]}
         ],
-        'skill2': {'type': 'proc', 'chance': 0.20, 'effect': 'dmg', 'val': 2.00},         # 20% chance to deal 100% extra damage[cite: 15]
+        'skill2': {'type': 'proc', 'chance': 0.20, 'effect': 'dmg', 'val': 2.00},
         'skill3': [
-            {'type': 'periodic_proc', 'interval': 4, 'effect': 'dmg', 'val': 1.25},      # Every 4 attacks: increases damage of all troops by 25%[cite: 15]
-            {'type': 'periodic_proc', 'interval': 4, 'effect': 'dmg_reduction', 'val': 0.25, 'duration': 2} # Reduces damage taken by 25% for 2 turns[cite: 15]
+            {'type': 'periodic_proc', 'interval': 4, 'effect': 'dmg', 'val': 1.25},
+            {'type': 'periodic_proc', 'interval': 4, 'effect': 'dmg_reduction', 'val': 0.25, 'duration': 2}
         ],
-        'widget': {'has_widget': True, 'scenario': 'rally', 'type': 'lethality', 'val': 0.15} # +15% Lethality when attacking rally
+        'widget': {'has_widget': True, 'scenario': 'rally', 'type': 'lethality', 'val': 0.15}
     }
 
     # Joiners
@@ -136,7 +133,6 @@ def load_hero_db():
     return db
 
 class SideCombatState:
-    """Manages active procs, damage multipliers, and turn-by-turn skill effects for a side."""
     def __init__(self):
         self.procs = []
         self.dodge = 0.0
@@ -146,28 +142,20 @@ class SideCombatState:
         self.class_dmg_up = np.zeros(3)
 
     def register_skills_from_hero(self, hero_dict):
-        if not hero_dict:
-            return
+        if not hero_dict: return
         for s_key in ['skill1', 'skill2', 'skill3']:
             sk = hero_dict.get(s_key)
-            if not sk:
-                continue
+            if not sk: continue
             if isinstance(sk, list):
-                for sub in sk:
-                    self._parse_single_skill(sub)
-            else:
-                self._parse_single_skill(sk)
+                for sub in sk: self._parse_single_skill(sub)
+            else: self._parse_single_skill(sk)
 
     def register_joiner_skill(self, hero_dict):
-        """Registers only Skill 1 for supporter/joiner slots."""
-        if not hero_dict or 'skill1' not in hero_dict:
-            return
+        if not hero_dict or 'skill1' not in hero_dict: return
         sk = hero_dict['skill1']
         if isinstance(sk, list):
-            for sub in sk:
-                self._parse_single_skill(sub)
-        else:
-            self._parse_single_skill(sk)
+            for sub in sk: self._parse_single_skill(sub)
+        else: self._parse_single_skill(sk)
 
     def _parse_single_skill(self, skill):
         stype = skill.get('type')
@@ -178,8 +166,7 @@ class SideCombatState:
         elif stype == 'class_atk_buff':
             self.class_atk_mod[skill.get('target_class', 2)] += val
         elif stype == 'class_dmg_buff':
-            buffs = skill.get('buffs', [0.0, 0.0, 0.0])
-            self.class_dmg_up += np.array(buffs)
+            self.class_dmg_up += np.array(skill.get('buffs', [0.0, 0.0, 0.0]))
         elif stype == 'enemy_taken_up':
             self.base_enemy_taken_up += val
         elif stype == 'dmg_reduction':
@@ -188,7 +175,6 @@ class SideCombatState:
             self.procs.append(skill)
 
     def roll_round_procs(self, round_idx):
-        """Rolls stochastic and periodic procs for the current round."""
         round_dmg_bonus = 1.0
         class_dmg_bonus = np.ones(3)
         enemy_taken_bonus = self.base_enemy_taken_up
@@ -209,19 +195,22 @@ class SideCombatState:
                 t_class = proc.get('target_class', None)
                 
                 if eff in ['dmg', 'double_strike']:
+                    # Handle raw additive bonus (val=2.00 means +100% damage, so add (val - 1.0) or val if intended as bonus)
+                    bonus = (val - 1.0) if val >= 1.0 else val
                     if t_class is not None:
-                        class_dmg_bonus[t_class] += max(0.0, val - 1.0)
+                        class_dmg_bonus[t_class] += max(0.0, bonus)
                     else:
-                        round_dmg_bonus += max(0.0, val - 1.0)
+                        round_dmg_bonus += max(0.0, bonus)
                 elif eff == 'enemy_taken_up':
-                    enemy_taken_bonus += max(0.0, val - 1.0)
+                    bonus = (val - 1.0) if val >= 1.0 else val
+                    enemy_taken_bonus += max(0.0, val if val < 1.0 else bonus)
                 elif eff == 'dmg_reduction':
                     round_reduct *= max(0.0, 1.0 - val)
                     
         return round_dmg_bonus, class_dmg_bonus, enemy_taken_bonus, round_reduct
 
 # =========================================================================
-# --- COMPLETE SCRATCH-BUILT ENGINE WITH GEN 1-5 HERO SUPPORT ---
+# --- COMPLETE SIMULATOR ENGINE ---
 # =========================================================================
 def kingshot_multirally_sim2(rally_waves, garrison, max_rounds=200):
     cav_backline_split = 0.20
@@ -229,9 +218,9 @@ def kingshot_multirally_sim2(rally_waves, garrison, max_rounds=200):
     current_garrison = garrison.clone()
 
     counter_matrix = np.array([
-        [1.0, 1.1, 0.9],  # Infantry vs [Inf, Cav, Arch]
-        [0.9, 1.0, 1.1],  # Cavalry vs [Inf, Cav, Arch]
-        [1.1, 0.9, 1.0]   # Archers vs [Inf, Cav, Arch]
+        [1.0, 1.1, 0.9],
+        [0.9, 1.0, 1.1],
+        [1.1, 0.9, 1.0]
     ])
 
     wave_logs = []
@@ -242,7 +231,6 @@ def kingshot_multirally_sim2(rally_waves, garrison, max_rounds=200):
         a_state = SideCombatState()
         d_state = SideCombatState()
 
-        # Register Attacker Heroes (Leaders = all 3 + widget, Joiners = Skill 1)
         for h_name in attacker.leader_heroes:
             if h_name in hero_db:
                 a_state.register_skills_from_hero(hero_db[h_name])
@@ -250,18 +238,13 @@ def kingshot_multirally_sim2(rally_waves, garrison, max_rounds=200):
                 if h_def.get('widget', {}).get('has_widget') and h_def['widget']['scenario'] == 'rally':
                     w_type = h_def['widget']['type']
                     w_val = h_def['widget']['val']
-                    if w_type == 'lethality':
-                        attacker.ui_multipliers[:, 2] += w_val
-                    elif w_type == 'defense':
-                        attacker.ui_multipliers[:, 1] += w_val
-                    elif w_type == 'atk':
-                        attacker.ui_multipliers[:, 0] += w_val
+                    if w_type == 'lethality': attacker.ui_multipliers[:, 2] += w_val
+                    elif w_type == 'defense': attacker.ui_multipliers[:, 1] += w_val
+                    elif w_type == 'atk': attacker.ui_multipliers[:, 0] += w_val
 
         for h_name in attacker.supporter_heroes[:4]:
-            if h_name in hero_db:
-                a_state.register_joiner_skill(hero_db[h_name])
+            if h_name in hero_db: a_state.register_joiner_skill(hero_db[h_name])
 
-        # Register Garrison Heroes (Leaders = all 3 + widget, Joiners = Skill 1)
         for h_name in current_garrison.leader_heroes:
             if h_name in hero_db:
                 d_state.register_skills_from_hero(hero_db[h_name])
@@ -269,16 +252,12 @@ def kingshot_multirally_sim2(rally_waves, garrison, max_rounds=200):
                 if h_def.get('widget', {}).get('has_widget') and h_def['widget']['scenario'] == 'garrison':
                     w_type = h_def['widget']['type']
                     w_val = h_def['widget']['val']
-                    if w_type == 'lethality':
-                        current_garrison.ui_multipliers[:, 2] += w_val
-                    elif w_type == 'defense':
-                        current_garrison.ui_multipliers[:, 1] += w_val
-                    elif w_type == 'atk':
-                        current_garrison.ui_multipliers[:, 0] += w_val
+                    if w_type == 'lethality': current_garrison.ui_multipliers[:, 2] += w_val
+                    elif w_type == 'defense': current_garrison.ui_multipliers[:, 1] += w_val
+                    elif w_type == 'atk': current_garrison.ui_multipliers[:, 0] += w_val
 
         for h_name in current_garrison.supporter_heroes[:4]:
-            if h_name in hero_db:
-                d_state.register_joiner_skill(hero_db[h_name])
+            if h_name in hero_db: d_state.register_joiner_skill(hero_db[h_name])
 
         a_att_power = (attacker.true_base_stats[:, 0] * attacker.ui_multipliers[:, 0] * (1.0 + a_state.class_atk_mod) *
                        attacker.true_base_stats[:, 2] * attacker.ui_multipliers[:, 2]) / 100.0
@@ -314,7 +293,6 @@ def kingshot_multirally_sim2(rally_waves, garrison, max_rounds=200):
                 if np.sum(a_troops) <= 0 or np.sum(d_troops) <= 0:
                     break
 
-                # --- Attacker Squad `idx` Strikes Defender ---
                 if a_troops[idx] > 0:
                     d_target = d_front
                     if idx == 1 and len(d_alive) > 1 and np.random.rand() < cav_backline_split:
@@ -325,16 +303,14 @@ def kingshot_multirally_sim2(rally_waves, garrison, max_rounds=200):
                     class_mult_a = 1.0 + a_state.class_dmg_up[idx] + (a_class_dmg[idx] - 1.0)
 
                     dmg_a = (army_factor_a * (a_att_power[idx] / d_def_pool[d_target]) * type_bonus_a * a_dmg_bonus * class_mult_a * (1.0 + d_taken_bonus)) / 100.0
-                    dmg_a *= d_reduct # Apply defender damage reduction mitigation
-                    if np.random.rand() < d_state.dodge:
-                        dmg_a *= 0.5
+                    dmg_a *= d_reduct
+                    if np.random.rand() < d_state.dodge: dmg_a *= 0.5
                     d_troops[d_target] = max(0.0, d_troops[d_target] - math.ceil(dmg_a))
 
                 d_alive = np.where(d_troops > 0)[0]
                 if len(d_alive) == 0: break
                 d_front = d_alive[0]
 
-                # --- Defender Squad `idx` Counterstrikes Attacker ---
                 if d_troops[idx] > 0:
                     a_target = a_front
                     if idx == 1 and len(a_alive) > 1 and np.random.rand() < cav_backline_split:
@@ -345,9 +321,8 @@ def kingshot_multirally_sim2(rally_waves, garrison, max_rounds=200):
                     class_mult_d = 1.0 + d_state.class_dmg_up[idx] + (d_class_dmg[idx] - 1.0)
 
                     dmg_d = (army_factor_d * (d_att_power[idx] / a_def_pool[a_target]) * type_bonus_d * d_dmg_bonus * class_mult_d * (1.0 + a_taken_bonus)) / 100.0
-                    dmg_d *= a_reduct # Apply attacker damage reduction mitigation
-                    if np.random.rand() < a_state.dodge:
-                        dmg_d *= 0.5
+                    dmg_d *= a_reduct
+                    if np.random.rand() < a_state.dodge: dmg_d *= 0.5
                     a_troops[a_target] = max(0.0, a_troops[a_target] - math.ceil(dmg_d))
 
                 a_alive = np.where(a_troops > 0)[0]
