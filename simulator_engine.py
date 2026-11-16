@@ -106,7 +106,7 @@ def load_hero_db():
             {'type': 'periodic_proc', 'interval': 4, 'effect': 'dmg', 'val': 2.00},      # Every 4 attacks: +100% extra damage (val = 2.00x)[cite: 13]
             {'type': 'periodic_proc', 'interval': 4, 'effect': 'enemy_taken_up', 'val': 0.15} # Target takes +15% extra damage[cite: 13]
         ],
-        'skill3': {'type': 'periodic_proc', 'interval': 4, 'target_class': 2, 'effect': 'dmg', 'val': 1.60}, # Archers deal +60% extra damage[cite: 13]
+        'skill3': {'type': 'periodic_proc', 'interval': 4, 'target_class': 2, 'effect': 'dmg', 'val': 0.60}, # Archers deal +60% extra damage[cite: 13]
         'widget': {'has_widget': True, 'scenario': 'rally', 'type': 'defense', 'val': 0.15}
     }
     db['Thrud'] = {
@@ -195,15 +195,12 @@ class SideCombatState:
                 t_class = proc.get('target_class', None)
                 
                 if eff in ['dmg', 'double_strike']:
-                    # Handle raw additive bonus (val=2.00 means +100% damage, so add (val - 1.0) or val if intended as bonus)
-                    bonus = (val - 1.0) if val >= 1.0 else val
                     if t_class is not None:
-                        class_dmg_bonus[t_class] += max(0.0, bonus)
+                        class_dmg_bonus[t_class] += val
                     else:
-                        round_dmg_bonus += max(0.0, bonus)
+                        round_dmg_bonus += val
                 elif eff == 'enemy_taken_up':
-                    bonus = (val - 1.0) if val >= 1.0 else val
-                    enemy_taken_bonus += max(0.0, val if val < 1.0 else bonus)
+                    enemy_taken_bonus += val
                 elif eff == 'dmg_reduction':
                     round_reduct *= max(0.0, 1.0 - val)
                     
