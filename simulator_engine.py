@@ -55,7 +55,9 @@ class TroopSide:
             ui_pct[:, 0] += self.widget_bonus
             ui_pct[:, 1] += self.widget_bonus
 
-        self.final_combat_stats = self.true_base_stats * (1.0 + (ui_pct / 100.0))
+        # Store UI percentages cleanly for direct scaling
+        self.ui_multipliers = 1.0 + (ui_pct / 100.0)
+        self.final_combat_stats = self.true_base_stats * self.ui_multipliers
 
     def calculate_widget_bonus(self):
         total_bonus = 0.0
@@ -265,11 +267,17 @@ def kingshot_multirally_sim2(rally_waves, garrison, max_rounds=200):
             if hero_name and hero_name != "None" and hero_name in hero_db:
                 d_skills.register_skill(hero_db[hero_name]['skill1'])
 
-        a_att_per_troop = (attacker.final_combat_stats[:, 0] * attacker.final_combat_stats[:, 2]) / 100.0
-        a_def_per_troop = (attacker.final_combat_stats[:, 1] * attacker.final_combat_stats[:, 3]) / 100.0
+# Use true Base Attack (Col 0) and Base Health (Col 3), scaled directly by UI Atk% and HP%, 
+        # and scale Offense/Defense pools using direct UI Atk/Leth and Def/HP products:
+        a_att_per_troop = (attacker.true_base_stats[:, 0] * attacker.ui_multipliers[:, 0] * 
+                           attacker.true_base_stats[:, 2] * attacker.ui_multipliers[:, 2]) / 100.0
+        a_def_per_troop = (attacker.true_base_stats[:, 1] * attacker.ui_multipliers[:, 1] * 
+                           attacker.true_base_stats[:, 3] * attacker.ui_multipliers[:, 3]) / 100.0
 
-        d_att_per_troop = (current_garrison.final_combat_stats[:, 0] * current_garrison.final_combat_stats[:, 2]) / 100.0
-        d_def_per_troop = (current_garrison.final_combat_stats[:, 1] * current_garrison.final_combat_stats[:, 3]) / 100.0
+        d_att_per_troop = (current_garrison.true_base_stats[:, 0] * current_garrison.ui_multipliers[:, 0] * 
+                           current_garrison.true_base_stats[:, 2] * current_garrison.ui_multipliers[:, 2]) / 100.0
+        d_def_per_troop = (current_garrison.true_base_stats[:, 1] * current_garrison.ui_multipliers[:, 1] * 
+                           current_garrison.true_base_stats[:, 3] * current_garrison.ui_multipliers[:, 3]) / 100.0
 
         a_troops = np.copy(attacker.troops)
         d_troops = np.copy(current_garrison.troops)
