@@ -22,7 +22,6 @@ def get_base_stats(troop_type, tier, tg_level):
         except Exception:
             pass
 
-    # Fallback matching the exact CSV table layout
     base_t10_tg5 = {
         'infantry': np.array([597.0, 10.0, 10.0, 1790.0]),
         'cavalry':  np.array([1790.0, 10.0, 10.0, 597.0]),
@@ -55,7 +54,6 @@ class TroopSide:
             ui_pct[:, 0] += self.widget_bonus
             ui_pct[:, 1] += self.widget_bonus
 
-        # Store UI percentages cleanly for direct scaling
         self.ui_multipliers = 1.0 + (ui_pct / 100.0)
         self.final_combat_stats = self.true_base_stats * self.ui_multipliers
 
@@ -75,13 +73,13 @@ class TroopSide:
         return copy.deepcopy(self)
 
 # =========================================================================
-# --- SKILLMOD & OP-CODE ENGINE (BATTLE REPORT COMPATIBLE) ---
+# --- SKILLMOD & OP-CODE ENGINE (PROCS RESTORED) ---
 # =========================================================================
 def map_skill_to_ops(skill):
     """
-    Translates a hero skill dictionary into standardized tuples.
-    Ignores static stats (atk, lethality, defense, health) since they are 
-    already baked into the battle report UI percentage numbers.
+    Translates hero skills. Static stats (atk, lethality, defense, health) 
+    are ignored since they are baked into UI percentages, but turn-by-turn 
+    procs and multipliers are fully registered.
     """
     if isinstance(skill, list):
         out = []
@@ -93,13 +91,15 @@ def map_skill_to_ops(skill):
     if sk_type in ['none', 'atk', 'lethality', 'defense', 'health']:
         return []
 
-    if sk_type == 'dmg':             return [('DamageUp', 102, skill.get('val', 0.0), None)]
+    # Map direct modifiers
+    if sk_type == 'dmg':             return [('DamageUp', 102, max(0.0, skill.get('val', 1.0) - 1.0), None)]
     if sk_type == 'dmg_reduction':   return [('DefenseUp', 111, skill.get('val', 0.0), None)]
     if sk_type == 'enemy_dmg_down':  return [('OppDamageDown', 201, skill.get('val', 0.0), None)]
     if sk_type == 'enemy_atk_down':  return [('OppDamageDown', 202, skill.get('val', 0.0), None)]
     if sk_type == 'enemy_leth_down': return [('OppDamageDown', 203, skill.get('val', 0.0), None)]
     if sk_type == 'enemy_taken_up':  return [('OppDefenseDown', 211, skill.get('val', 0.0), None)]
 
+    # Stochastic and special procs
     if sk_type in ['dodge', 'dodge_chance', 'class_dmg_buff', 'class_atk_buff', 'timed_shield', 'proc']:
         return [('Special', 0, 0.0, skill)]
 
@@ -155,7 +155,8 @@ class SideSkillState:
         for proc in self.procs:
             if np.random.rand() < proc.get('chance', 0.0):
                 eff = proc.get('effect')
-                raw_val = proc.get('val', 0.0)
+                raw_val = proc.get('val', 1.50)
+                # Correctly convert legacy 1.50 multiplier notation into a +0.50 additive round boost
                 bonus_val = (raw_val - 1.0) if raw_val >= 1.0 else raw_val
                 duration = proc.get('duration', 1)
 
@@ -267,8 +268,6 @@ def kingshot_multirally_sim2(rally_waves, garrison, max_rounds=200):
             if hero_name and hero_name != "None" and hero_name in hero_db:
                 d_skills.register_skill(hero_db[hero_name]['skill1'])
 
-# Use true Base Attack (Col 0) and Base Health (Col 3), scaled directly by UI Atk% and HP%, 
-        # and scale Offense/Defense pools using direct UI Atk/Leth and Def/HP products:
         a_att_per_troop = (attacker.true_base_stats[:, 0] * attacker.ui_multipliers[:, 0] * 
                            attacker.true_base_stats[:, 2] * attacker.ui_multipliers[:, 2]) / 100.0
         a_def_per_troop = (attacker.true_base_stats[:, 1] * attacker.ui_multipliers[:, 1] * 
