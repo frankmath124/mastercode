@@ -103,7 +103,7 @@ def load_hero_db():
     db['Vivian'] = {
         'skill1': {'type': 'enemy_taken_up', 'val': 0.25},                               # Permanent +25% Damage Taken[cite: 13]
         'skill2': [
-            {'type': 'periodic_proc', 'interval': 4, 'effect': 'dmg', 'val': 2.00},      # Every 4 attacks: +100% extra damage (val = 2.00x)[cite: 13]
+            {'type': 'periodic_proc', 'interval': 4, 'effect': 'dmg', 'val': 1.00},      # Every 4 attacks: +100% extra damage (val = 2.00x)[cite: 13]
             {'type': 'periodic_proc', 'interval': 4, 'effect': 'enemy_taken_up', 'val': 0.15} # Target takes +15% extra damage[cite: 13]
         ],
         'skill3': {'type': 'periodic_proc', 'interval': 4, 'target_class': 2, 'effect': 'dmg', 'val': 0.60}, # Archers deal +60% extra damage[cite: 13]
