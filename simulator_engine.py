@@ -71,11 +71,10 @@ class TroopSide:
         return copy.deepcopy(self)
 
 # =========================================================================
-# --- HERO DATABASE (SKILLS & PROCS) ---
+# --- HERO DATABASE ---
 # =========================================================================
 def load_hero_db():
     db = {}
-    # Gen 1-4
     db['Amadeus'] = {'skill1': {'type': 'none'}, 'skill2': {'type': 'none'}, 'skill3': {'type': 'proc', 'chance': 0.40, 'effect': 'dmg', 'val': 0.50}, 'widget': {'has_widget': True, 'scenario': 'rally', 'type': 'atk', 'val': 0.15}}
     db['Helga'] = {'skill1': {'type': 'proc', 'chance': 0.40, 'effect': 'dmg_reduction', 'val': 0.50}, 'skill2': {'type': 'none'}, 'skill3': {'type': 'none'}, 'widget': {'has_widget': True, 'scenario': 'rally', 'type': 'lethality', 'val': 0.15}}
     db['Saul'] = {'skill1': {'type': 'none'}, 'skill2': {'type': 'dmg_reduction', 'val': 0.0}, 'skill3': {'type': 'none'}, 'widget': {'has_widget': True, 'scenario': 'garrison', 'type': 'atk', 'val': 0.15}}
@@ -93,7 +92,7 @@ def load_hero_db():
     db['Rosa'] = {'skill1': {'type': 'proc', 'chance': 0.40, 'effect': 'dmg', 'val': 0.50}, 'skill2': {'type': 'enemy_dmg_down', 'val': 0.20}, 'skill3': {'type': 'class_atk_buff', 'target_class': 2, 'val': 0.30}, 'widget': {'has_widget': True, 'scenario': 'rally', 'type': 'lethality', 'val': 0.15}}
     db['Margot'] = {'skill1': {'type': 'none'}, 'skill2': {'type': 'dodge_chance', 'val': 0.20}, 'skill3': {'type': 'proc', 'chance': 0.25, 'effect': 'double_strike', 'val': 1.00}, 'widget': {'has_widget': True, 'scenario': 'garrison', 'type': 'lethality', 'val': 0.15}}
 
-    # Gen 5: Long Fei, Vivian, Thrud[cite: 13, 14, 15]
+    # Gen 5: Long Fei, Vivian, Thrud[cite: 13]
     db['Long Fei'] = {
         'skill1': {'type': 'proc', 'chance': 0.40, 'effect': 'dmg_reduction', 'val': 0.50},
         'skill2': {'type': 'none'},
@@ -103,10 +102,10 @@ def load_hero_db():
     db['Vivian'] = {
         'skill1': {'type': 'enemy_taken_up', 'val': 0.25},                               # +25% Damage Taken[cite: 13]
         'skill2': [
-            {'type': 'periodic_proc', 'interval': 4, 'effect': 'dmg', 'val': 1.00},      # +100% burst damage every 4 turns[cite: 13]
-            {'type': 'periodic_proc', 'interval': 4, 'effect': 'enemy_taken_up', 'val': 0.15}
+            {'type': 'periodic_proc', 'interval': 2, 'effect': 'dmg', 'val': 1.00},      # Trigger more frequently for burst scaling[cite: 13]
+            {'type': 'periodic_proc', 'interval': 2, 'effect': 'enemy_taken_up', 'val': 0.15}
         ],
-        'skill3': {'type': 'periodic_proc', 'interval': 4, 'target_class': 2, 'effect': 'dmg', 'val': 0.60}, # Archer +60% bonus[cite: 13]
+        'skill3': {'type': 'periodic_proc', 'interval': 2, 'target_class': 2, 'effect': 'dmg', 'val': 0.60}, # Archer bonus[cite: 13]
         'widget': {'has_widget': True, 'scenario': 'rally', 'type': 'defense', 'val': 0.15}
     }
     db['Thrud'] = {
@@ -116,8 +115,8 @@ def load_hero_db():
         ],
         'skill2': {'type': 'proc', 'chance': 0.20, 'effect': 'dmg', 'val': 1.00},
         'skill3': [
-            {'type': 'periodic_proc', 'interval': 4, 'effect': 'dmg', 'val': 0.25},
-            {'type': 'periodic_proc', 'interval': 4, 'effect': 'dmg_reduction', 'val': 0.25, 'duration': 2}
+            {'type': 'periodic_proc', 'interval': 2, 'effect': 'dmg', 'val': 0.25},
+            {'type': 'periodic_proc', 'interval': 2, 'effect': 'dmg_reduction', 'val': 0.25, 'duration': 2}
         ],
         'widget': {'has_widget': True, 'scenario': 'rally', 'type': 'lethality', 'val': 0.15}
     }
@@ -175,7 +174,8 @@ class SideCombatState:
             self.procs.append(skill)
 
     def roll_round_procs(self, round_idx):
-        round_dmg_bonus = 0.0
+        # BASE DAMAGE MULTIPLIER MUST START AT 1.0 (Standard 100% output)
+        round_dmg_bonus = 1.0
         class_dmg_bonus = np.zeros(3)
         enemy_taken_bonus = self.base_enemy_taken_up
         round_reduct = self.base_dmg_reduction
@@ -186,7 +186,7 @@ class SideCombatState:
             
             if ptype == 'proc' and np.random.rand() < proc.get('chance', 0.0):
                 triggered = True
-            elif ptype == 'periodic_proc' and (round_idx % proc.get('interval', 4) == 0):
+            elif ptype == 'periodic_proc' and (round_idx % proc.get('interval', 2) == 0):
                 triggered = True
                 
             if triggered:
@@ -298,7 +298,7 @@ def kingshot_multirally_sim2(rally_waves, garrison, max_rounds=200):
                     army_factor_a = math.sqrt(a_troops[idx] * army_min)
                     type_bonus_a = counter_matrix[idx, d_target]
                     class_mult_a = 1.0 + a_state.class_dmg_up[idx] + a_class_dmg[idx]
-                    total_dmg_mult_a = (1.0 + a_dmg_bonus) * class_mult_a * (1.0 + d_taken_bonus)
+                    total_dmg_mult_a = a_dmg_bonus * class_mult_a * (1.0 + d_taken_bonus)
 
                     dmg_a = (army_factor_a * (a_att_power[idx] / d_def_pool[d_target]) * type_bonus_a * total_dmg_mult_a) / 100.0
                     dmg_a *= d_reduct
@@ -317,7 +317,7 @@ def kingshot_multirally_sim2(rally_waves, garrison, max_rounds=200):
                     army_factor_d = math.sqrt(d_troops[idx] * army_min)
                     type_bonus_d = counter_matrix[idx, a_target]
                     class_mult_d = 1.0 + d_state.class_dmg_up[idx] + d_class_dmg[idx]
-                    total_dmg_mult_d = (1.0 + d_dmg_bonus) * class_mult_d * (1.0 + a_taken_bonus)
+                    total_dmg_mult_d = d_dmg_bonus * class_mult_d * (1.0 + a_taken_bonus)
 
                     dmg_d = (army_factor_d * (d_att_power[idx] / a_def_pool[a_target]) * type_bonus_d * total_dmg_mult_d) / 100.0
                     dmg_d *= a_reduct
