@@ -71,42 +71,42 @@ class TroopSide:
         return copy.deepcopy(self)
 
 # =========================================================================
-# --- HERO DATABASE (FIXED VIVIAN PROC PARSING) ---
+# --- HERO DATABASE (SKILLS & PROCS) ---
 # =========================================================================
 def load_hero_db():
     db = {}
     # Gen 1-4
-    db['Amadeus'] = {'skill1': {'type': 'lethality', 'val': 0.25}, 'skill2': {'type': 'atk', 'val': 0.25}, 'skill3': {'type': 'proc', 'chance': 0.40, 'effect': 'dmg', 'val': 1.50}, 'widget': {'has_widget': True, 'scenario': 'rally', 'type': 'atk', 'val': 0.15}}
-    db['Helga'] = {'skill1': {'type': 'proc', 'chance': 0.40, 'effect': 'dmg_reduction', 'val': 0.50}, 'skill2': {'type': 'atk', 'val': 0.25}, 'skill3': {'type': 'lethality', 'val': 0.25}, 'widget': {'has_widget': True, 'scenario': 'rally', 'type': 'lethality', 'val': 0.15}}
-    db['Saul'] = {'skill1': [{'type': 'health', 'val': 0.15}, {'type': 'defense', 'val': 0.10}], 'skill2': {'type': 'dmg_reduction', 'val': 0.0}, 'skill3': {'type': 'lethality', 'val': 0.25}, 'widget': {'has_widget': True, 'scenario': 'garrison', 'type': 'atk', 'val': 0.15}}
-    db['Jabel'] = {'skill1': {'type': 'proc', 'chance': 0.50, 'effect': 'dmg_reduction', 'val': 0.40}, 'skill2': {'type': 'proc', 'chance': 0.50, 'effect': 'dmg', 'val': 1.50}, 'skill3': {'type': 'dmg', 'val': 0.25}, 'widget': {'has_widget': True, 'scenario': 'rally', 'type': 'lethality', 'val': 0.15}}
+    db['Amadeus'] = {'skill1': {'type': 'none'}, 'skill2': {'type': 'none'}, 'skill3': {'type': 'proc', 'chance': 0.40, 'effect': 'dmg', 'val': 0.50}, 'widget': {'has_widget': True, 'scenario': 'rally', 'type': 'atk', 'val': 0.15}}
+    db['Helga'] = {'skill1': {'type': 'proc', 'chance': 0.40, 'effect': 'dmg_reduction', 'val': 0.50}, 'skill2': {'type': 'none'}, 'skill3': {'type': 'none'}, 'widget': {'has_widget': True, 'scenario': 'rally', 'type': 'lethality', 'val': 0.15}}
+    db['Saul'] = {'skill1': {'type': 'none'}, 'skill2': {'type': 'dmg_reduction', 'val': 0.0}, 'skill3': {'type': 'none'}, 'widget': {'has_widget': True, 'scenario': 'garrison', 'type': 'atk', 'val': 0.15}}
+    db['Jabel'] = {'skill1': {'type': 'proc', 'chance': 0.50, 'effect': 'dmg_reduction', 'val': 0.40}, 'skill2': {'type': 'proc', 'chance': 0.50, 'effect': 'dmg', 'val': 0.50}, 'skill3': {'type': 'none'}, 'widget': {'has_widget': True, 'scenario': 'rally', 'type': 'lethality', 'val': 0.15}}
     
-    db['Zoe'] = {'skill1': {'type': 'proc', 'chance': 0.40, 'effect': 'dmg', 'val': 1.40}, 'skill2': {'type': 'atk', 'val': 0.25}, 'skill3': {'type': 'proc', 'chance': 0.50, 'effect': 'enemy_taken_up', 'val': 1.50}, 'widget': {'has_widget': True, 'scenario': 'garrison', 'type': 'atk', 'val': 0.10}}
-    db['Marlin'] = {'skill1': {'type': 'proc', 'chance': 0.50, 'effect': 'dmg', 'val': 1.50}, 'skill2': {'type': 'proc', 'chance': 0.20, 'effect': 'enemy_leth_down', 'val': 0.50, 'duration': 2}, 'skill3': {'type': 'proc', 'chance': 0.50, 'effect': 'dmg', 'val': 1.50}, 'widget': {'has_widget': True, 'scenario': 'rally', 'type': 'lethality', 'val': 0.15}}
-    db['Hilde'] = {'skill1': [{'type': 'atk', 'val': 0.15}, {'type': 'defense', 'val': 0.10}], 'skill2': {'type': 'proc', 'chance': 0.25, 'effect': 'dmg', 'val': 2.00}, 'skill3': {'type': 'proc', 'chance': 0.40, 'effect': 'dmg_reduction', 'val': 0.50}, 'widget': {'has_widget': True, 'scenario': 'garrison', 'type': 'dodge', 'val': 0.05}}
+    db['Zoe'] = {'skill1': {'type': 'proc', 'chance': 0.40, 'effect': 'dmg', 'val': 0.40}, 'skill2': {'type': 'none'}, 'skill3': {'type': 'proc', 'chance': 0.50, 'effect': 'enemy_taken_up', 'val': 0.50}, 'widget': {'has_widget': True, 'scenario': 'garrison', 'type': 'atk', 'val': 0.10}}
+    db['Marlin'] = {'skill1': {'type': 'proc', 'chance': 0.50, 'effect': 'dmg', 'val': 0.50}, 'skill2': {'type': 'proc', 'chance': 0.20, 'effect': 'enemy_leth_down', 'val': 0.50, 'duration': 2}, 'skill3': {'type': 'proc', 'chance': 0.50, 'effect': 'dmg', 'val': 0.50}, 'widget': {'has_widget': True, 'scenario': 'rally', 'type': 'lethality', 'val': 0.15}}
+    db['Hilde'] = {'skill1': {'type': 'none'}, 'skill2': {'type': 'proc', 'chance': 0.25, 'effect': 'dmg', 'val': 1.00}, 'skill3': {'type': 'proc', 'chance': 0.40, 'effect': 'dmg_reduction', 'val': 0.50}, 'widget': {'has_widget': True, 'scenario': 'garrison', 'type': 'dodge', 'val': 0.05}}
     
-    db['Petra'] = {'skill1': {'type': 'proc', 'chance': 0.50, 'effect': 'enemy_taken_up', 'val': 1.50}, 'skill2': {'type': 'proc', 'chance': 0.50, 'effect': 'atk', 'val': 1.50}, 'skill3': {'type': 'proc', 'chance': 0.50, 'effect': 'dmg_reduction', 'val': 0.50}, 'widget': {'has_widget': True, 'scenario': 'rally', 'type': 'atk', 'val': 0.15}}
-    db['Eric'] = {'skill1': {'type': 'enemy_atk_down', 'val': 0.20}, 'skill2': {'type': 'dmg_reduction', 'val': 0.20}, 'skill3': {'type': 'health', 'val': 0.25}, 'widget': {'has_widget': True, 'scenario': 'garrison', 'type': 'defense', 'val': 0.15}}
-    db['Jaegar'] = {'skill1': {'type': 'proc', 'chance': 0.20, 'effect': 'dmg', 'val': 1.40}, 'skill2': {'type': 'proc', 'chance': 0.20, 'effect': 'enemy_leth_down', 'val': 0.50, 'duration': 2}, 'skill3': {'type': 'health', 'val': 0.25}, 'widget': {'has_widget': True, 'scenario': 'rally', 'type': 'health', 'val': 0.15}}
+    db['Petra'] = {'skill1': {'type': 'proc', 'chance': 0.50, 'effect': 'enemy_taken_up', 'val': 0.50}, 'skill2': {'type': 'proc', 'chance': 0.50, 'effect': 'none'}, 'skill3': {'type': 'proc', 'chance': 0.50, 'effect': 'dmg_reduction', 'val': 0.50}, 'widget': {'has_widget': True, 'scenario': 'rally', 'type': 'atk', 'val': 0.15}}
+    db['Eric'] = {'skill1': {'type': 'none'}, 'skill2': {'type': 'dmg_reduction', 'val': 0.20}, 'skill3': {'type': 'none'}, 'widget': {'has_widget': True, 'scenario': 'garrison', 'type': 'defense', 'val': 0.15}}
+    db['Jaegar'] = {'skill1': {'type': 'proc', 'chance': 0.20, 'effect': 'dmg', 'val': 0.40}, 'skill2': {'type': 'proc', 'chance': 0.20, 'effect': 'enemy_leth_down', 'val': 0.50, 'duration': 2}, 'skill3': {'type': 'none'}, 'widget': {'has_widget': True, 'scenario': 'rally', 'type': 'health', 'val': 0.15}}
     
     db['Alcar'] = {'skill1': {'type': 'timed_shield', 'interval': 5, 'duration': 2, 'val': 0.70, 'targets': [0, 2]}, 'skill2': {'type': 'class_dmg_buff', 'buffs': [1.00, 0.10, 0.10]}, 'skill3': [{'type': 'class_dmg_buff', 'buffs': [0.60, 0.0, 0.0]}, {'type': 'enemy_taken_up', 'val': 0.25}], 'widget': {'has_widget': True, 'scenario': 'garrison', 'type': 'health', 'val': 0.15}}
-    db['Rosa'] = {'skill1': {'type': 'proc', 'chance': 0.40, 'effect': 'dmg', 'val': 1.50}, 'skill2': {'type': 'enemy_dmg_down', 'val': 0.20}, 'skill3': {'type': 'class_atk_buff', 'target_class': 2, 'val': 0.30}, 'widget': {'has_widget': True, 'scenario': 'rally', 'type': 'lethality', 'val': 0.15}}
-    db['Margot'] = {'skill1': {'type': 'atk', 'val': 0.25}, 'skill2': {'type': 'dodge_chance', 'val': 0.20}, 'skill3': {'type': 'proc', 'chance': 0.25, 'effect': 'double_strike', 'val': 2.00}, 'widget': {'has_widget': True, 'scenario': 'garrison', 'type': 'lethality', 'val': 0.15}}
+    db['Rosa'] = {'skill1': {'type': 'proc', 'chance': 0.40, 'effect': 'dmg', 'val': 0.50}, 'skill2': {'type': 'enemy_dmg_down', 'val': 0.20}, 'skill3': {'type': 'class_atk_buff', 'target_class': 2, 'val': 0.30}, 'widget': {'has_widget': True, 'scenario': 'rally', 'type': 'lethality', 'val': 0.15}}
+    db['Margot'] = {'skill1': {'type': 'none'}, 'skill2': {'type': 'dodge_chance', 'val': 0.20}, 'skill3': {'type': 'proc', 'chance': 0.25, 'effect': 'double_strike', 'val': 1.00}, 'widget': {'has_widget': True, 'scenario': 'garrison', 'type': 'lethality', 'val': 0.15}}
 
     # Gen 5: Long Fei, Vivian, Thrud[cite: 13, 14, 15]
     db['Long Fei'] = {
         'skill1': {'type': 'proc', 'chance': 0.40, 'effect': 'dmg_reduction', 'val': 0.50},
-        'skill2': {'type': 'defense', 'val': 0.25},
-        'skill3': {'type': 'proc', 'chance': 0.25, 'effect': 'dmg', 'val': 2.00},
+        'skill2': {'type': 'none'},
+        'skill3': {'type': 'proc', 'chance': 0.25, 'effect': 'dmg', 'val': 1.00},
         'widget': {'has_widget': True, 'scenario': 'garrison', 'type': 'atk', 'val': 0.15}
     }
     db['Vivian'] = {
-        'skill1': {'type': 'enemy_taken_up', 'val': 0.25},                               # Permanent +25% Damage Taken[cite: 13]
+        'skill1': {'type': 'enemy_taken_up', 'val': 0.25},                               # +25% Damage Taken[cite: 13]
         'skill2': [
-            {'type': 'periodic_proc', 'interval': 4, 'effect': 'dmg', 'val': 1.00},      # Every 4 attacks: +100% extra damage (val = 2.00x)[cite: 13]
-            {'type': 'periodic_proc', 'interval': 4, 'effect': 'enemy_taken_up', 'val': 0.15} # Target takes +15% extra damage[cite: 13]
+            {'type': 'periodic_proc', 'interval': 4, 'effect': 'dmg', 'val': 1.00},      # +100% burst damage every 4 turns[cite: 13]
+            {'type': 'periodic_proc', 'interval': 4, 'effect': 'enemy_taken_up', 'val': 0.15}
         ],
-        'skill3': {'type': 'periodic_proc', 'interval': 4, 'target_class': 2, 'effect': 'dmg', 'val': 0.60}, # Archers deal +60% extra damage[cite: 13]
+        'skill3': {'type': 'periodic_proc', 'interval': 4, 'target_class': 2, 'effect': 'dmg', 'val': 0.60}, # Archer +60% bonus[cite: 13]
         'widget': {'has_widget': True, 'scenario': 'rally', 'type': 'defense', 'val': 0.15}
     }
     db['Thrud'] = {
@@ -114,21 +114,21 @@ def load_hero_db():
             {'type': 'dmg_reduction', 'val': 0.15},
             {'type': 'class_dmg_buff', 'buffs': [0.15, 0.0, 0.15]}
         ],
-        'skill2': {'type': 'proc', 'chance': 0.20, 'effect': 'dmg', 'val': 2.00},
+        'skill2': {'type': 'proc', 'chance': 0.20, 'effect': 'dmg', 'val': 1.00},
         'skill3': [
-            {'type': 'periodic_proc', 'interval': 4, 'effect': 'dmg', 'val': 1.25},
+            {'type': 'periodic_proc', 'interval': 4, 'effect': 'dmg', 'val': 0.25},
             {'type': 'periodic_proc', 'interval': 4, 'effect': 'dmg_reduction', 'val': 0.25, 'duration': 2}
         ],
         'widget': {'has_widget': True, 'scenario': 'rally', 'type': 'lethality', 'val': 0.15}
     }
 
     # Joiners
-    db['Gordon'] = {'skill1': {'type': 'health', 'val': 0.25}, 'skill2': {'type': 'none'}, 'skill3': {'type': 'atk', 'val': 0.25}, 'widget': {'has_widget': False}}
+    db['Gordon'] = {'skill1': {'type': 'none'}, 'skill2': {'type': 'none'}, 'skill3': {'type': 'none'}, 'widget': {'has_widget': False}}
     db['Fahd'] = {'skill1': {'type': 'enemy_dmg_down', 'val': 0.20}, 'skill2': {'type': 'none'}, 'skill3': {'type': 'none'}, 'widget': {'has_widget': False}}
-    db['Chenko'] = {'skill1': {'type': 'lethality', 'val': 0.25}, 'skill2': {'type': 'none'}, 'skill3': {'type': 'health', 'val': 0.15}, 'widget': {'has_widget': False}}
-    db['Yaenwoo'] = {'skill1': {'type': 'lethality', 'val': 0.25}, 'skill2': {'type': 'none'}, 'skill3': {'type': 'health', 'val': 0.15}, 'widget': {'has_widget': False}}
+    db['Chenko'] = {'skill1': {'type': 'none'}, 'skill2': {'type': 'none'}, 'skill3': {'type': 'none'}, 'widget': {'has_widget': False}}
+    db['Yaenwoo'] = {'skill1': {'type': 'none'}, 'skill2': {'type': 'none'}, 'skill3': {'type': 'none'}, 'widget': {'has_widget': False}}
     db['Howard'] = {'skill1': {'type': 'dmg_reduction', 'val': 0.20}, 'skill2': {'type': 'enemy_atk_down', 'val': 0.20}, 'skill3': {'type': 'none'}, 'widget': {'has_widget': False}}
-    db['Amane'] = {'skill1': {'type': 'atk', 'val': 0.25}, 'skill2': {'type': 'none'}, 'skill3': {'type': 'none'}, 'widget': {'has_widget': False}}
+    db['Amane'] = {'skill1': {'type': 'none'}, 'skill2': {'type': 'none'}, 'skill3': {'type': 'none'}, 'widget': {'has_widget': False}}
     db['Quinn'] = {'skill1': {'type': 'dmg_reduction', 'val': 0.20}, 'skill2': {'type': 'dmg', 'val': 0.50}, 'skill3': {'type': 'none'}, 'widget': {'has_widget': False}}
     return db
 
@@ -175,8 +175,8 @@ class SideCombatState:
             self.procs.append(skill)
 
     def roll_round_procs(self, round_idx):
-        round_dmg_bonus = 1.0
-        class_dmg_bonus = np.ones(3)
+        round_dmg_bonus = 0.0
+        class_dmg_bonus = np.zeros(3)
         enemy_taken_bonus = self.base_enemy_taken_up
         round_reduct = self.base_dmg_reduction
         
@@ -191,7 +191,7 @@ class SideCombatState:
                 
             if triggered:
                 eff = proc.get('effect')
-                val = proc.get('val', 1.0)
+                val = proc.get('val', 0.0)
                 t_class = proc.get('target_class', None)
                 
                 if eff in ['dmg', 'double_strike']:
@@ -297,9 +297,10 @@ def kingshot_multirally_sim2(rally_waves, garrison, max_rounds=200):
 
                     army_factor_a = math.sqrt(a_troops[idx] * army_min)
                     type_bonus_a = counter_matrix[idx, d_target]
-                    class_mult_a = 1.0 + a_state.class_dmg_up[idx] + (a_class_dmg[idx] - 1.0)
+                    class_mult_a = 1.0 + a_state.class_dmg_up[idx] + a_class_dmg[idx]
+                    total_dmg_mult_a = (1.0 + a_dmg_bonus) * class_mult_a * (1.0 + d_taken_bonus)
 
-                    dmg_a = (army_factor_a * (a_att_power[idx] / d_def_pool[d_target]) * type_bonus_a * a_dmg_bonus * class_mult_a * (1.0 + d_taken_bonus)) / 100.0
+                    dmg_a = (army_factor_a * (a_att_power[idx] / d_def_pool[d_target]) * type_bonus_a * total_dmg_mult_a) / 100.0
                     dmg_a *= d_reduct
                     if np.random.rand() < d_state.dodge: dmg_a *= 0.5
                     d_troops[d_target] = max(0.0, d_troops[d_target] - math.ceil(dmg_a))
@@ -315,9 +316,10 @@ def kingshot_multirally_sim2(rally_waves, garrison, max_rounds=200):
 
                     army_factor_d = math.sqrt(d_troops[idx] * army_min)
                     type_bonus_d = counter_matrix[idx, a_target]
-                    class_mult_d = 1.0 + d_state.class_dmg_up[idx] + (d_class_dmg[idx] - 1.0)
+                    class_mult_d = 1.0 + d_state.class_dmg_up[idx] + d_class_dmg[idx]
+                    total_dmg_mult_d = (1.0 + d_dmg_bonus) * class_mult_d * (1.0 + a_taken_bonus)
 
-                    dmg_d = (army_factor_d * (d_att_power[idx] / a_def_pool[a_target]) * type_bonus_d * d_dmg_bonus * class_mult_d * (1.0 + a_taken_bonus)) / 100.0
+                    dmg_d = (army_factor_d * (d_att_power[idx] / a_def_pool[a_target]) * type_bonus_d * total_dmg_mult_d) / 100.0
                     dmg_d *= a_reduct
                     if np.random.rand() < a_state.dodge: dmg_d *= 0.5
                     a_troops[a_target] = max(0.0, a_troops[a_target] - math.ceil(dmg_d))
