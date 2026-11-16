@@ -260,9 +260,9 @@ else:
     hero_db = load_hero_db()
     hero_list = ["None"] + sorted(list(hero_db.keys()))
     
-    infantry_heroes = ["None"] + sorted(["Eric", "Zoe", "Amadeus", "Helga", "Howard", "Alcar"])
-    cavalry_heroes = ["None"] + sorted(["Gordon", "Fahd", "Chenko", "Petra", "Hilde", "Jabel", "Margot"])
-    archer_heroes = ["None"] + sorted(["Jaegar", "Marlin", "Saul", "Yaenwoo", "Amane", "Quinn", "Rosa"])
+    infantry_heroes = ["None"] + sorted(["Eric", "Zoe", "Amadeus", "Helga", "Howard", "Alcar","Long Fei"])
+    cavalry_heroes = ["None"] + sorted(["Gordon", "Fahd", "Chenko", "Petra", "Hilde", "Jabel", "Margot","Thrud"])
+    archer_heroes = ["None"] + sorted(["Jaegar", "Marlin", "Saul", "Yaenwoo", "Amane", "Quinn", "Rosa","Vivian"])
     
     # --- SYSTEM PERFORMANCE OPTIMIZATION SIDEBAR ---
     st.sidebar.markdown("## ⚙️ Calculation Engine Controls")
