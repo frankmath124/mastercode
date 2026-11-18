@@ -2194,31 +2194,54 @@ else:
                 accumulated_gains = {t: [0.0 for _ in range(2)] for t in ["infantry", "cavalry", "archer"]}
                 accumulated_costs = {t: [{"Satin": 0, "Threads": 0, "Vision": 0} for _ in range(2)] for t in ["infantry", "cavalry", "archer"]}
 
-                def get_class_gov_total_pct(piece_pair):
-                    p1, p2 = piece_pair[0], piece_pair[1]
-                    s1 = sum(gov_atlas["deltas"][:p1+1])
-                    s2 = sum(gov_atlas["deltas"][:p2+1])
-                    set_b = gov_atlas["set_bonuses"][min(p1, p2)]
-                    return s1 + s2 + set_b
+                def get_gov_stat_breakdown(gov_state):
+                    """
+                    Calculates both the per-class base stats and the global 3-piece / 6-piece 
+                    (plus class 2-piece) set bonuses across all 6 governor gear pieces.
+                    Returns a dict of total % boost per troop class: {'infantry': float, 'cavalry': float, 'archer': float}
+                    and metadata on active 3pc / 6pc thresholds.
+                    """
+                    all_6 = (
+                        list(gov_state["infantry"]) + 
+                        list(gov_state["cavalry"]) + 
+                        list(gov_state["archer"])
+                    )
+                    # Sort descending to find the 3rd highest piece (3-piece set) and 6th highest piece (6-piece full set)
+                    sorted_desc = sorted(all_6, reverse=True)
+                    tier_3pc = sorted_desc[2]  # Highest tier shared by at least 3 pieces
+                    tier_6pc = sorted_desc[5]  # Highest tier shared by all 6 pieces
+
+                    # Pull from gov_atlas["set_bonuses"] (50% weight for 3-piece, 50% for 6-piece so full 6pc = 100% of table value)
+                    bonus_3pc = gov_atlas["set_bonuses"][tier_3pc] * 0.50
+                    bonus_6pc = gov_atlas["set_bonuses"][tier_6pc] * 0.50
+                    global_set_bonus = bonus_3pc + bonus_6pc
+
+                    class_totals = {}
+                    for troop in ["infantry", "cavalry", "archer"]:
+                        p1, p2 = gov_state[troop][0], gov_state[troop][1]
+                        s1 = sum(gov_atlas["deltas"][:p1+1])
+                        s2 = sum(gov_atlas["deltas"][:p2+1])
+                        class_totals[troop] = s1 + s2 + global_set_bonus
+
+                    return class_totals, tier_3pc, tier_6pc, global_set_bonus
 
                 def build_gov_modified_my_stats(gov_state):
-                    """Applies only the net delta (- starting gov gear + tested gov gear) across all 4 stats."""
+                    """Applies the net delta (- starting gov gear + tested gov gear, including 3pc/6pc set bonuses) across all 4 stats."""
                     my_stats_matrix = np.array([
                         [my_ia, my_id, my_il, my_ih], 
                         [my_ca, my_cd, my_cl, my_ch], 
                         [my_aa, my_ad, my_al, my_ah]
                     ], dtype=float)
                     
+                    base_totals, _, _, _ = get_gov_stat_breakdown(starting_gov)
+                    new_totals, _, _, _ = get_gov_stat_breakdown(gov_state)
+                    
                     for r, troop in enumerate(["infantry", "cavalry", "archer"]):
-                        base_boost = get_class_gov_total_pct(starting_gov[troop])
-                        new_boost = get_class_gov_total_pct(gov_state[troop])
-                        delta_boost = new_boost - base_boost
-                        
-                        # Governor Gear + Set Bonuses apply equally to Atk, Def, Leth, and HP
-                        my_stats_matrix[r, 0] += delta_boost
-                        my_stats_matrix[r, 1] += delta_boost
-                        my_stats_matrix[r, 2] += delta_boost
-                        my_stats_matrix[r, 3] += delta_boost
+                        delta_boost = new_totals[troop] - base_totals[troop]
+                        my_stats_matrix[r, 0] += delta_boost  # Atk
+                        my_stats_matrix[r, 1] += delta_boost  # Def
+                        my_stats_matrix[r, 2] += delta_boost  # Leth
+                        my_stats_matrix[r, 3] += delta_boost  # HP
                         
                     return my_stats_matrix
 
@@ -2286,12 +2309,14 @@ else:
                 test_bump = 30.0
                 for r, t_name in enumerate(["infantry", "cavalry", "archer"]):
                     bumped_stats = np.copy(base_my_stats)
-                    bumped_stats[r, :] += test_bump  # Boost all 4 stats equally
+                    bumped_stats[r, :] += test_bump
                     b_score, _, _, _ = evaluate_gov_matchup(bumped_stats, runs=gv_precision)
                     gov_class_sensitivity[t_name] = max(1.0, (b_score - base_score) / test_bump)
                     gv_progress.progress(0.20 + (0.15 * (r + 1)))
 
-                # 3. Exhaustive Greedy Loop with Triple Squared Scarcity & Set Bonus Awareness
+                total_army_sensitivity = sum(gov_class_sensitivity.values())
+
+                # 3. Exhaustive Greedy Loop with 3-Piece / 6-Piece Set Bonus Lookahead
                 action_step = 0
                 max_tier_idx = len(gov_names) - 1
                 while True:
@@ -2310,8 +2335,14 @@ else:
                     w_threads = 1.0 / (t_pool ** 2)
                     w_vision = 1.0 / (v_pool ** 2)
 
+                    curr_totals, curr_3pc, curr_6pc, curr_global_set = get_gov_stat_breakdown(running_gov)
+                    all_6_curr = (
+                        list(running_gov["infantry"]) + 
+                        list(running_gov["cavalry"]) + 
+                        list(running_gov["archer"])
+                    )
+
                     for troop in ["infantry", "cavalry", "archer"]:
-                        curr_total_boost = get_class_gov_total_pct(running_gov[troop])
                         for slot_idx, current_lvl in enumerate(running_gov[troop]):
                             if current_lvl >= max_tier_idx:
                                 continue 
@@ -2322,16 +2353,33 @@ else:
                             req_v = gov_atlas["vision"][target_lvl]
                             
                             if gv_wallet["Satin"] >= req_s and gv_wallet["Threads"] >= req_t and gv_wallet["Vision"] >= req_v and (req_s > 0 or req_t > 0 or req_v > 0):
-                                test_pair = list(running_gov[troop])
-                                test_pair[slot_idx] = target_lvl
-                                new_total_boost = get_class_gov_total_pct(test_pair)
+                                test_gov = copy.deepcopy(running_gov)
+                                test_gov[troop][slot_idx] = target_lvl
+                                _, new_3pc, new_6pc, new_global_set = get_gov_stat_breakdown(test_gov)
                                 
-                                # Exact total stat delta including any triggered Set Bonus jump!
-                                total_stat_delta = max(0.001, new_total_boost - curr_total_boost)
-                                base_piece_delta = gov_atlas["deltas"][target_lvl]
-                                set_bonus_delta = max(0.0, total_stat_delta - base_piece_delta)
+                                base_piece_delta = max(0.001, gov_atlas["deltas"][target_lvl])
+                                exact_set_delta = max(0.0, new_global_set - curr_global_set)
+
+                                # Lookahead Horizon Pull: If upgrading a lagging piece moves us closer to the next 6pc or 3pc set bonus,
+                                # award a pro-rated fraction of the upcoming set bonus so lagging pieces don't get stranded!
+                                lookahead_set_credit = 0.0
+                                if exact_set_delta == 0.0:
+                                    next_set_jump_6pc = max(0.0, (gov_atlas["set_bonuses"][target_lvl] - gov_atlas["set_bonuses"][curr_6pc]) * 0.50)
+                                    if current_lvl == curr_6pc and next_set_jump_6pc > 0:
+                                        num_at_floor = sum(1 for x in all_6_curr if x == curr_6pc)
+                                        lookahead_set_credit += next_set_jump_6pc / float(num_at_floor)
+
+                                    next_set_jump_3pc = max(0.0, (gov_atlas["set_bonuses"][target_lvl] - gov_atlas["set_bonuses"][curr_3pc]) * 0.50)
+                                    if current_lvl == curr_3pc and next_set_jump_3pc > 0:
+                                        num_needed_3pc = max(1, 3 - sum(1 for x in all_6_curr if x >= target_lvl))
+                                        lookahead_set_credit += next_set_jump_3pc / float(num_needed_3pc)
+
+                                # Base piece stat helps its specific troop class; Set Bonus helps ALL 3 troop classes!
+                                combat_gain = (
+                                    (base_piece_delta * gov_class_sensitivity[troop]) + 
+                                    ((exact_set_delta + lookahead_set_credit) * total_army_sensitivity)
+                                )
                                 
-                                combat_gain = total_stat_delta * gov_class_sensitivity[troop]
                                 resource_score = (req_s * w_satin) + (req_t * w_threads) + (req_v * w_vision)
                                 efficiency = combat_gain / max(1e-12, resource_score)
                                 
@@ -2339,8 +2387,8 @@ else:
                                     "troop": troop, "slot": slot_idx,
                                     "from_lvl": current_lvl, "next_lvl": target_lvl,
                                     "cost_s": req_s, "cost_t": req_t, "cost_v": req_v,
-                                    "base_delta": base_piece_delta, "set_delta": set_bonus_delta,
-                                    "total_delta": total_stat_delta, "efficiency": efficiency
+                                    "base_delta": base_piece_delta, "set_delta": exact_set_delta,
+                                    "efficiency": efficiency
                                 })
 
                     if not candidates:
@@ -2412,23 +2460,30 @@ else:
                     st.subheader("📋 Consolidated Governor Upgrade Action Plan")
                     st.dataframe(pd.DataFrame(consolidated_rows), hide_index=True, use_container_width=True)
                     
-                    # Highlight Set Bonus changes if any occurred
-                    st.markdown("#### ⚡ Set Bonus Impacts")
-                    set_bonus_text = []
-                    for troop in ["infantry", "cavalry", "archer"]:
-                        old_min = min(starting_gov[troop][0], starting_gov[troop][1])
-                        new_min = min(running_gov[troop][0], running_gov[troop][1])
-                        if old_min != new_min:
-                            old_bonus = gov_atlas["set_bonuses"][old_min]
-                            new_bonus = gov_atlas["set_bonuses"][new_min]
-                            if new_bonus > old_bonus:
-                                set_bonus_text.append(f"- **{troop.capitalize()} Set Bonus Unlocked:** Upgraded from +{old_bonus:.2f}% to **+{new_bonus:.2f}%** (+{new_bonus - old_bonus:.2f}% across all 4 stats)")
+                    # Highlight Global 3-Piece & 6-Piece Set Bonus changes
+                    st.markdown("#### ⚡ Multi-Piece Set Bonus Impacts (3-Piece & 6-Piece Global Sets)")
+                    _, old_3pc, old_6pc, old_glob_bonus = get_gov_stat_breakdown(starting_gov)
+                    _, new_3pc, new_6pc, new_glob_bonus = get_gov_stat_breakdown(running_gov)
                     
-                    if set_bonus_text:
-                        for text in set_bonus_text:
-                            st.success(text)
+                    set_bonus_msgs = []
+                    if new_3pc > old_3pc and gov_atlas["set_bonuses"][new_3pc] > gov_atlas["set_bonuses"][old_3pc]:
+                        set_bonus_msgs.append(
+                            f"- **3-Piece Set Threshold Upgraded:** {gov_names[old_3pc]} ➔ **{gov_names[new_3pc]}**"
+                        )
+                    if new_6pc > old_6pc and gov_atlas["set_bonuses"][new_6pc] > gov_atlas["set_bonuses"][old_6pc]:
+                        set_bonus_msgs.append(
+                            f"- **6-Piece Full Set Threshold Upgraded:** {gov_names[old_6pc]} ➔ **{gov_names[new_6pc]}**"
+                        )
+                    if new_glob_bonus > old_glob_bonus:
+                        set_bonus_msgs.append(
+                            f"- **Total All-Troop Set Bonus Gain:** +{old_glob_bonus:.2f}% ➔ **+{new_glob_bonus:.2f}%** (**+{new_glob_bonus - old_glob_bonus:.2f}%** to All Troops Attack, Defense, Lethality & Health)"
+                        )
+                    
+                    if set_bonus_msgs:
+                        for msg in set_bonus_msgs:
+                            st.success(msg)
                     else:
-                        st.info("No new Set Bonus thresholds were crossed during this specific roadmap calculation.")
+                        st.info(f"Current Active Set Thresholds: **3-Piece @ {gov_names[new_3pc]}** | **6-Piece @ {gov_names[new_6pc]}** (No new set bonus tier boundary was crossed with this budget).")
 
                     with st.expander(f"📜 View Chronological Step-by-Step Governor Gear Sequence ({len(gov_roadmap)} Steps)", expanded=False):
                         gv_step_rows = []
@@ -2436,14 +2491,14 @@ else:
                             c_parts = [f"{step_item['cost_s']:,} Satin"]
                             if step_item['cost_t'] > 0: c_parts.append(f"{step_item['cost_t']:,} Threads")
                             if step_item['cost_v'] > 0: c_parts.append(f"{step_item['cost_v']:,} Vision")
-                            gain_str = f"+{step_item['base_delta']:.2f}% Base"
+                            gain_str = f"+{step_item['base_delta']:.2f}% Class"
                             if step_item['set_delta'] > 0:
-                                gain_str += f" (+{step_item['set_delta']:.2f}% Set Bonus!)"
+                                gain_str += f" (+{step_item['set_delta']:.2f}% ALL-TROOP SET BONUS UNLOCKED!)"
                             gv_step_rows.append({
                                 "Step #": idx_s,
                                 "Piece": f"{step_item['troop'].capitalize()} Piece #{step_item['slot'] + 1}",
                                 "Tier Step": f"{gov_names[step_item['from_lvl']]} ➔ {gov_names[step_item['next_lvl']]}",
-                                "Stat Yield (All 4)": gain_str,
+                                "Stat Yield": gain_str,
                                 "Cost": ", ".join(c_parts)
                             })
                         st.dataframe(pd.DataFrame(gv_step_rows), hide_index=True, use_container_width=True)
