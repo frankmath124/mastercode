@@ -1686,12 +1686,13 @@ else:
                 rem_col4.metric("Remaining Mythic Pieces", f"{best_wallet_remainder['Mythic Piece']:,.0f}")
             else:
                 st.error("❌ Not enough materials in your inventory to afford any single valid upgrade from your current gear levels.")    
+
 # =========================================================================
     # --- TAB 5: SURGICAL CHARMS OPTIMIZER ---
     # =========================================================================
     with tab_charms:
         st.header("⚡ Surgical Charms Optimizer")
-        st.caption("Optimizes all 18 charm slots dynamically using direct Monte Carlo simulation output squared against item scarcity.")
+        st.caption("Exhaustively optimizes all 18 charm slots using pre-computed combat gradients and squared item scarcity until materials run out.")
 
         charm_atlas = load_charm_cost_atlas()
 
@@ -1707,21 +1708,18 @@ else:
             
             st.markdown("---")
             st.markdown("### ⚙️ Search Precision")
-            ch_precision = st.slider("Monte Carlo Pass Precision", 10, 150, 40, step=10, key="ch_precision_slider")
-            max_actions = st.number_input("Max Upgrades to Map", min_value=1, max_value=30, value=10, step=1)
+            ch_precision = st.slider("Monte Carlo Pass Precision", 20, 250, 100, step=10, key="ch_precision_slider")
+            st.caption("Upgrades will cycle continuously until your Guides or Designs cannot afford any valid step.")
 
         with c_main:
             st.markdown("### 🔮 Current Charm Levels (0 - 22)")
             
-            # Group Charms logically into 3 Troop columns
             ch_col1, ch_col2, ch_col3 = st.columns(3)
-            
             current_charms = {"infantry": [], "cavalry": [], "archer": []}
             
             with ch_col1:
                 st.markdown("#### 🛡️ Infantry Charms")
                 for i in range(6):
-                    # Changed min_value to 0 to support un-forged empty slots
                     lvl = st.number_input(f"Infantry Slot #{i+1}", min_value=0, max_value=22, value=5, step=1, key=f"ch_inf_{i}")
                     current_charms["infantry"].append(lvl)
                     
@@ -1739,126 +1737,169 @@ else:
 
             st.markdown("---")
             
-            if st.button("🚀 Execute Combat-Driven Charms Optimization", type="primary", use_container_width=True, key="ch_run_btn"):
+            if st.button("🚀 Execute Exhaustive Charms Optimization", type="primary", use_container_width=True, key="ch_run_btn"):
                 ch_progress = st.progress(0)
                 ch_status = st.empty()
                 
-                # Snapshot wallets
                 ch_wallet = {"Guides": inv_guides, "Designs": inv_designs}
                 running_charms = copy.deepcopy(current_charms)
+                starting_levels = copy.deepcopy(current_charms)
                 charms_roadmap = []
                 
-                # Tracking accumulation matrix per charm slot to consolidate output
                 accumulated_gains = {t: [0.0 for _ in range(6)] for t in ["infantry", "cavalry", "archer"]}
                 accumulated_costs = {t: [{"Guides": 0, "Designs": 0} for _ in range(6)] for t in ["infantry", "cavalry", "archer"]}
-                starting_levels = copy.deepcopy(current_charms)
 
-                def run_charm_isolated_simulation(charm_state):
-                    """Injects the baseline battle report stats modified by the running charm configurations."""
+                def get_class_charm_total_pct(charm_list):
+                    return sum(sum(charm_atlas["deltas"][:lvl+1]) for lvl in charm_list)
+
+                def build_charm_modified_my_stats(charm_state):
+                    """Applies only the net delta (- starting charms + tested charms) to YOUR battle report stats."""
                     my_stats_matrix = np.array([
                         [my_ia, my_id, my_il, my_ih], 
                         [my_ca, my_cd, my_cl, my_ch], 
                         [my_aa, my_ad, my_al, my_ah]
-                    ])
+                    ], dtype=float)
+                    
+                    for r, troop in enumerate(["infantry", "cavalry", "archer"]):
+                        base_pct = get_class_charm_total_pct(starting_levels[troop])
+                        new_pct = get_class_charm_total_pct(charm_state[troop])
+                        delta_pct = new_pct - base_pct
+                        
+                        # Charms boost Lethality (Col 2) and Health (Col 3) equally
+                        my_stats_matrix[r, 2] += delta_pct
+                        my_stats_matrix[r, 3] += delta_pct
+                        
+                    return my_stats_matrix
+
+                def evaluate_charm_matchup(my_stats_matrix, runs=ch_precision):
                     opp_stats_matrix = np.array([
                         [opp_ia, opp_id, opp_il, opp_ih],
                         [opp_ca, opp_cd, opp_cl, opp_ch],
                         [opp_aa, opp_ad, opp_al, opp_ah]
-                    ])
+                    ], dtype=float)
                     
-                    target_matrix = my_stats_matrix if opt_role == "Rally Attacker" else opp_stats_matrix
-                    
-                    # Add Charm stat values onto the battle matrix baseline
-                    for r, troop in enumerate(["infantry", "cavalry", "archer"]):
-                        total_stat_pct = 0.0
-                        for lvl in charm_state[troop]:
-                            # Slice sums up all cumulative stats up to the current level
-                            total_stat_pct += sum(charm_atlas["deltas"][:lvl+1])
-                        
-                        # Charms uniformly increase both Lethality (Col 2) and Health (Col 3)
-                        target_matrix[r, 2] += total_stat_pct
-                        target_matrix[r, 3] += total_stat_pct
+                    my_joiners = [
+                        st.session_state.get("g_my_j1", "None"),
+                        st.session_state.get("g_my_j2", "None"),
+                        st.session_state.get("g_my_j3", "None"),
+                        st.session_state.get("g_my_j4", "None")
+                    ]
+                    opp_joiners = [
+                        st.session_state.get("g_opp_j1", "None"),
+                        st.session_state.get("g_opp_j2", "None"),
+                        st.session_state.get("g_opp_j3", "None"),
+                        st.session_state.get("g_opp_j4", "None")
+                    ]
 
-                    my_march = TroopSide([my_inf, my_cav, my_arc], my_stats_matrix, [my_h1, my_h2, my_h3], ["None"]*4)
-                    opp_march = TroopSide([opp_inf, opp_cav, opp_arc], opp_stats_matrix, [opp_h1, opp_h2, opp_h3], ["None"]*4)
+                    my_march = TroopSide([my_inf, my_cav, my_arc], my_stats_matrix, [my_h1, my_h2, my_h3], my_joiners)
+                    opp_march = TroopSide([opp_inf, opp_cav, opp_arc], opp_stats_matrix, [opp_h1, opp_h2, opp_h3], opp_joiners)
                     
                     attacker_side = my_march if opt_role == "Rally Attacker" else opp_march
                     defender_side = opp_march if opt_role == "Rally Attacker" else my_march
                     
-                    total_surviving_target = 0
-                    for _ in range(ch_precision):
-                        res = kingshot_multirally_sim2([attacker_side.clone()], defender_side.clone())
-                        total_surviving_target += np.sum(res[1][0]['attacker_surviving']) if opt_role == "Rally Attacker" else np.sum(res[0].troops)
-                            
-                    return total_surviving_target / ch_precision
+                    wins = 0
+                    my_surv_total = 0.0
+                    opp_surv_total = 0.0
+                    
+                    for _ in range(runs):
+                        final_g, logs = kingshot_multirally_sim2([attacker_side.clone()], defender_side.clone())
+                        att_rem = float(np.sum(logs[0]['attacker_surviving']))
+                        def_rem = float(np.sum(final_g.troops))
+                        
+                        if opt_role == "Rally Attacker":
+                            my_surv_total += att_rem
+                            opp_surv_total += def_rem
+                            if def_rem <= 0:
+                                wins += 1
+                        else:
+                            my_surv_total += def_rem
+                            opp_surv_total += att_rem
+                            if def_rem > 0:
+                                wins += 1
+                                
+                    win_prob_pct = (wins / float(runs)) * 100.0
+                    avg_my_surv = my_surv_total / float(runs)
+                    avg_opp_surv = opp_surv_total / float(runs)
+                    combat_score = (win_prob_pct * 500.0) + avg_my_surv - avg_opp_surv
+                    return combat_score, win_prob_pct, avg_my_surv, avg_opp_surv
 
-                # -------------------------------------------------------------------------
-                # --- GREEDY SEARCH LOOP WITH SQUARED SCARCITY SCORING ---
-                # -------------------------------------------------------------------------
-                for action_step in range(1, max_actions + 1):
-                    ch_status.markdown(f"**🔍 Calculating Optimal Charm Progression Step #{action_step}...**")
-                    
-                    control_surv = run_charm_isolated_simulation(running_charms)
+                # 1. Measure Baseline (BEFORE Upgrades)
+                ch_status.markdown("**📊 Evaluating Baseline Matchup (Before Charm Upgrades)...**")
+                base_my_stats = build_charm_modified_my_stats(starting_levels)
+                base_score, ch_before_win, ch_before_my_surv, ch_before_opp_surv = evaluate_charm_matchup(base_my_stats, runs=ch_precision)
+                ch_progress.progress(0.20)
+
+                # 2. Pre-Compute Combined (Lethality + Health) Gradient per Troop Class
+                ch_status.markdown("**🧭 Measuring Charm Combat Gradients (Lethality + Health per Class)...**")
+                charm_class_sensitivity = {}
+                test_bump = 40.0
+                for r, t_name in enumerate(["infantry", "cavalry", "archer"]):
+                    bumped_stats = np.copy(base_my_stats)
+                    bumped_stats[r, 2] += test_bump  # Lethality
+                    bumped_stats[r, 3] += test_bump  # Health
+                    b_score, _, _, _ = evaluate_charm_matchup(bumped_stats, runs=ch_precision)
+                    charm_class_sensitivity[t_name] = max(1.0, (b_score - base_score) / test_bump)
+                    ch_progress.progress(0.20 + (0.15 * (r + 1)))
+
+                # 3. Exhaustive Greedy Loop with Dynamic Squared Scarcity
+                action_step = 0
+                while True:
+                    action_step += 1
+                    if action_step > 1000:
+                        break
+                    if action_step % 10 == 1:
+                        ch_status.markdown(f"**🔍 Depleting Charm Materials | Step #{action_step}...**")
+
                     candidates = []
-                    
-                    # Squared Scarcity Weight calculations based on current wallets
                     g_pool = max(1, ch_wallet["Guides"])
                     d_pool = max(1, ch_wallet["Designs"])
-                    
                     w_guides = 1.0 / (g_pool ** 2)
                     w_designs = 1.0 / (d_pool ** 2)
 
                     for troop in ["infantry", "cavalry", "archer"]:
                         for slot_idx, current_lvl in enumerate(running_charms[troop]):
                             if current_lvl >= 22:
-                                continue # Max level cap boundary reached
+                                continue
                                 
                             target_lvl = current_lvl + 1
                             req_g = charm_atlas["guides"][target_lvl]
                             req_d = charm_atlas["designs"][target_lvl]
                             
-                            if ch_wallet["Guides"] >= req_g and ch_wallet["Designs"] >= req_d:
-                                # Clone profile and nudge slot
-                                test_charms = copy.deepcopy(running_charms)
-                                test_charms[troop][slot_idx] += 1
+                            if ch_wallet["Guides"] >= req_g and ch_wallet["Designs"] >= req_d and (req_g > 0 or req_d > 0):
+                                stat_delta = max(0.001, charm_atlas["deltas"][target_lvl])
+                                combat_gain = stat_delta * charm_class_sensitivity[troop]
                                 
-                                test_surv = run_charm_isolated_simulation(test_charms)
-                                troops_saved = max(0.001, test_surv - control_surv)
-                                
-                                # Apply Squared Scarcity cost weighting denominator
                                 resource_score = (req_g * w_guides) + (req_d * w_designs)
-                                efficiency = troops_saved / max(1e-9, resource_score)
+                                efficiency = combat_gain / max(1e-12, resource_score)
                                 
                                 candidates.append({
-                                    "troop": troop, "slot": slot_idx, "next_lvl": target_lvl,
-                                    "cost_g": req_g, "cost_d": req_d, "efficiency": efficiency, "saved": troops_saved
+                                    "troop": troop, "slot": slot_idx,
+                                    "from_lvl": current_lvl, "next_lvl": target_lvl,
+                                    "cost_g": req_g, "cost_d": req_d,
+                                    "stat_delta": stat_delta, "efficiency": efficiency
                                 })
 
                     if not candidates:
-                        ch_progress.progress(1.0)
                         break
                         
-                    # Choose step winner
                     candidates.sort(key=lambda x: x["efficiency"], reverse=True)
                     winner = candidates[0]
                     
-                    # Deduct assets from loop wallet
                     ch_wallet["Guides"] -= winner["cost_g"]
                     ch_wallet["Designs"] -= winner["cost_d"]
+                    running_charms[winner["troop"]][winner["slot"]] = winner["next_lvl"]
                     
-                    # Mutate loop states
-                    running_charms[winner["troop"]][winner["slot"]] += 1
-                    
-                    # Accumulate tracking arrays for consolidated output mapping
-                    lvl_idx = winner["next_lvl"]
-                    stat_gain_amt = charm_atlas["deltas"][lvl_idx]
-                    
-                    accumulated_gains[winner["troop"]][winner["slot"]] += stat_gain_amt
+                    accumulated_gains[winner["troop"]][winner["slot"]] += winner["stat_delta"]
                     accumulated_costs[winner["troop"]][winner["slot"]]["Guides"] += winner["cost_g"]
                     accumulated_costs[winner["troop"]][winner["slot"]]["Designs"] += winner["cost_d"]
                     
                     charms_roadmap.append(winner)
-                    ch_progress.progress(action_step / max_actions)
+
+                # 4. Final Verification Simulation (AFTER Upgrades)
+                ch_progress.progress(0.90)
+                ch_status.markdown("**🏁 Running Final Before vs. After Win Probability Verification...**")
+                final_my_stats = build_charm_modified_my_stats(running_charms)
+                _, ch_after_win, ch_after_my_surv, ch_after_opp_surv = evaluate_charm_matchup(final_my_stats, runs=ch_precision)
 
                 ch_progress.empty()
                 ch_status.empty()
@@ -1867,8 +1908,16 @@ else:
                 # --- CONSOLIDATE AND DISPLAY FINAL BLUEPRINT ---
                 # -------------------------------------------------------------------------
                 if charms_roadmap:
-                    st.success("🎯 Optimal Charm Allocation Roadmap Compiled Successfully!")
+                    st.success(f"🎯 Exhaustive Charm Roadmap Compiled! Executed **{len(charms_roadmap)} total charm upgrades** until materials ran out.")
                     
+                    # --- BEFORE VS AFTER WIN PROBABILITY & SURVIVOR IMPACT BANNER ---
+                    st.markdown("### 📈 Before vs. After Charm Upgrade Combat Impact")
+                    c_imp1, c_imp2, c_imp3, c_imp4 = st.columns(4)
+                    c_imp1.metric("Before Win Probability", f"{ch_before_win:.1f}%")
+                    c_imp2.metric("After Win Probability", f"{ch_after_win:.1f}%", f"{ch_after_win - ch_before_win:+.1f}% Win Chance")
+                    c_imp3.metric("Your Avg Survivors (Before ➔ After)", f"{ch_after_my_surv:,.0f}", f"{ch_after_my_surv - ch_before_my_surv:+,.0f} Troops")
+                    c_imp4.metric("Rival Avg Survivors (Before ➔ After)", f"{ch_after_opp_surv:,.0f}", f"{ch_after_opp_surv - ch_before_opp_surv:+,.0f} Enemy Troops", delta_color="inverse")
+
                     consolidated_rows = []
                     for troop in ["infantry", "cavalry", "archer"]:
                         for slot_idx in range(6):
@@ -1877,35 +1926,44 @@ else:
                             
                             if start_l != end_l:
                                 costs = accumulated_costs[troop][slot_idx]
-                                cost_display = f"+{costs['Guides']:,} Guides, +{costs['Designs']:,} Designs"
+                                cost_display = f"{costs['Guides']:,} Guides, {costs['Designs']:,} Designs"
                                 stat_gain = accumulated_gains[troop][slot_idx]
                                 
                                 consolidated_rows.append({
                                     "Charm Piece Target": f"{troop.capitalize()} Charm Slot #{slot_idx + 1}",
-                                    "Level Transition": f"Level {start_l} ➔ {end_l}",
+                                    "Level Transition": f"Level {start_l} ➔ {end_l} (+{end_l - start_l})",
                                     "Total Resource Allocation Required": cost_display,
-                                    "Stat Gain Yield (Lethality & HP)": f"+{stat_gain:.2f}%"
+                                    "Stat Gain Yield (Lethality & HP)": f"+{stat_gain:.2f}% Leth & HP"
                                 })
                                 
                     st.subheader("📋 Consolidated Charm Upgrade Action Plan")
-                    if consolidated_rows:
-                        st.dataframe(pd.DataFrame(consolidated_rows), hide_index=True, use_container_width=True)
-                    else:
-                        st.info("No level transitions occurred. Upgrades analyzed were outvalued by core budget limits.")
+                    st.dataframe(pd.DataFrame(consolidated_rows), hide_index=True, use_container_width=True)
+
+                    with st.expander(f"📜 View Chronological Step-by-Step Charm Upgrade Sequence ({len(charms_roadmap)} Steps)", expanded=False):
+                        ch_step_rows = []
+                        for idx_s, step_item in enumerate(charms_roadmap, 1):
+                            ch_step_rows.append({
+                                "Step #": idx_s,
+                                "Charm Slot": f"{step_item['troop'].capitalize()} Slot #{step_item['slot'] + 1}",
+                                "Level Step": f"Lv {step_item['from_lvl']} ➔ Lv {step_item['next_lvl']}",
+                                "Stat Gain": f"+{step_item['stat_delta']:.2f}% Leth & HP",
+                                "Cost": f"{step_item['cost_g']:,} Guides, {step_item['cost_d']:,} Designs"
+                            })
+                        st.dataframe(pd.DataFrame(ch_step_rows), hide_index=True, use_container_width=True)
                         
                     st.markdown("#### 👛 Remaining Asset Reserves After Processing")
                     r_ch1, r_ch2 = st.columns(2)
                     r_ch1.metric("Remaining Charm Guides", f"{ch_wallet['Guides']:,}")
                     r_ch2.metric("Remaining Charm Designs", f"{ch_wallet['Designs']:,}")
                 else:
-                    st.error("❌ The algorithm was unable to calculate an upgrade link. Verify your input balances or max upgrade constraints.")
+                    st.error("❌ Not enough Charm Guides or Charm Designs in your inventory to afford any single upgrade from your current charm levels.")
 
-                    # =========================================================================
+    # =========================================================================
     # --- TAB 6: GOVERNOR GEAR OPTIMIZER ---
     # =========================================================================
     with tab_gov:
         st.header("👑 Governor Gear Optimizer")
-        st.caption("Calculates exact ROI across all 58 tiers, automatically factoring in Cumulative Set Bonuses and multi-resource bottlenecks.")
+        st.caption("Exhaustively calculates exact ROI across all 58 tiers until materials run out, automatically factoring in Cumulative Set Bonuses and multi-resource bottlenecks.")
 
         gov_atlas = load_governor_gear_atlas()
         gov_names = gov_atlas["names"]
@@ -1922,8 +1980,8 @@ else:
             
             st.markdown("---")
             st.markdown("### ⚙️ Search Engine")
-            gv_precision = st.slider("MC Pass Precision", 10, 150, 40, step=10, key="gv_precision_slider")
-            gv_max_actions = st.number_input("Max Tiers to Map", min_value=1, max_value=20, value=6, step=1)
+            gv_precision = st.slider("MC Pass Precision", 20, 250, 100, step=10, key="gv_precision_slider")
+            st.caption("Upgrades will cycle continuously until your Satin, Threads, or Vision cannot afford any valid tier step.")
 
         with gv_main:
             st.markdown("### 📸 Auto-Scanner & Gear Assignment")
@@ -1940,21 +1998,16 @@ else:
                 
                 if st.session_state.get("gov_screenshot_uploader") is not None:
                     try:
-                        # 1. Load image and convert to OpenCV format (RGB)
                         img_pil = Image.open(st.session_state["gov_screenshot_uploader"]).convert('RGB')
                         img_np = np.array(img_pil)
                         h, w = img_np.shape[:2]
                         
                         def analyze_item_crop_cv2(item_crop):
                             """Uses HSV masking and Contour tracking to extract Tiers and Stars perfectly."""
-                            # Convert crop to HSV color space
                             hsv_crop = cv2.cvtColor(item_crop, cv2.COLOR_RGB2HSV)
                             
-                            # --- 1. TIER DETECTION (HSV) ---
-                            # Define strict Hue ranges for Kingshot gear tiers
-                            # OpenCV Hue goes from 0-179.
                             color_bounds = {
-                                "Red":    [([0, 100, 100], [10, 255, 255]), ([160, 100, 100], [179, 255, 255])], # Red wraps around 0/180
+                                "Red":    [([0, 100, 100], [10, 255, 255]), ([160, 100, 100], [179, 255, 255])],
                                 "Gold":   [([15, 100, 100], [35, 255, 255])],
                                 "Green":  [([40, 50, 50], [85, 255, 255])],
                                 "Blue":   [([90, 100, 100], [130, 255, 255])],
@@ -1971,25 +2024,20 @@ else:
                                 tier_scores[tier] = cv2.countNonZero(mask)
                                 
                             best_tier = max(tier_scores, key=tier_scores.get)
-                            if tier_scores[best_tier] < 50: best_tier = "Gold" # Fallback if unrecognizable
+                            if tier_scores[best_tier] < 50: best_tier = "Gold"
                             
-                            # --- 2. STAR DETECTION (CONTOURS) ---
-                            # Isolate bottom 40% where stars live
                             ch, cw = hsv_crop.shape[:2]
                             bottom_hsv = hsv_crop[int(ch*0.6):, :]
                             
-                            # Strict bright yellow mask for stars
                             lower_yellow = np.array([20, 150, 150], dtype=np.uint8)
                             upper_yellow = np.array([35, 255, 255], dtype=np.uint8)
                             star_mask = cv2.inRange(bottom_hsv, lower_yellow, upper_yellow)
                             
-                            # Use OpenCV to find distinct shapes (contours) in the yellow mask
                             contours, _ = cv2.findContours(star_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
                             
                             stars = 0
                             for contour in contours:
                                 area = cv2.contourArea(contour)
-                                # Filter out random noise specks; a real star will have some area
                                 if area > (cw * ch * 0.001): 
                                     stars += 1
                                     
@@ -2003,22 +2051,18 @@ else:
                             
                             col_img = img_np[y1:y2, x1:x2]
                             
-                            # Convert to grayscale and apply an edge-detection-like threshold
                             gray = cv2.cvtColor(col_img, cv2.COLOR_RGB2GRAY)
                             _, thresh = cv2.threshold(gray, 50, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)
                             
-                            # Horizontal projection to find blocks of high activity (gear boxes)
                             y_density = np.sum(thresh == 255, axis=1)
                             active_rows = np.where(y_density > (x2-x1)*0.2)[0]
                             
                             if len(active_rows) == 0:
                                 return [("Gold", 0)] * 3
                                 
-                            # Split into blocks where gaps are larger than 3% of height
                             gap_size = int(h * 0.03)
                             segments = np.split(active_rows, np.where(np.diff(active_rows) > gap_size)[0] + 1)
                             
-                            # Filter small noise and take the top 3 biggest blocks
                             segments = [seg for seg in segments if len(seg) > int(h * 0.05)]
                             segments = sorted(segments, key=len, reverse=True)[:3]
                             segments = sorted(segments, key=lambda s: s[0])
@@ -2034,7 +2078,6 @@ else:
                                 
                             return results
                         
-                        # Process both columns with OpenCV
                         left_res = process_column_cv2("left")
                         right_res = process_column_cv2("right")
                         
@@ -2043,7 +2086,6 @@ else:
                             if t_name in gov_names:
                                 st.session_state[f"gv_{troop}_{piece_idx}"] = gov_names.index(t_name)
                         
-                        # Top = Cavalry, Mid = Infantry, Bottom = Archer
                         set_tier("cav", 0, left_res[0])
                         set_tier("inf", 0, left_res[1])
                         set_tier("arc", 0, left_res[2])
@@ -2052,7 +2094,6 @@ else:
                         set_tier("inf", 1, right_res[1])
                         set_tier("arc", 1, right_res[2])
                         
-                        # Charms - Keep fallbacks
                         for i in range(6):
                             st.session_state[f"ch_inf_{i}"] = 5
                             st.session_state[f"ch_cav_{i}"] = 4
@@ -2062,7 +2103,6 @@ else:
                     except Exception as e:
                         st.session_state["gov_toast"] = f"⚠️ Image processing error: {e}"
                 else:
-                    # GLOBAL DROPDOWN APPLY
                     global_tier = st.session_state.get("gv_global_set")
                     if global_tier in gov_names:
                         target_idx = gov_names.index(global_tier)
@@ -2141,84 +2181,127 @@ else:
             current_gov["archer"] = [lvl_0, lvl_1]
 
             st.markdown("---")
-                       
-
-# ... existing code ...
             
-            if st.button("🚀 Execute Governor Matrix Optimization", type="primary", use_container_width=True, key="gv_run_btn"):
+            if st.button("🚀 Execute Exhaustive Governor Matrix Optimization", type="primary", use_container_width=True, key="gv_run_btn"):
                 gv_progress = st.progress(0)
                 gv_status = st.empty()
                 
-                # Snapshot wallets
                 gv_wallet = {"Satin": inv_satin, "Threads": inv_threads, "Vision": inv_vision}
                 running_gov = copy.deepcopy(current_gov)
+                starting_gov = copy.deepcopy(current_gov)
                 gov_roadmap = []
                 
-                # Tracking accumulation matrix
                 accumulated_gains = {t: [0.0 for _ in range(2)] for t in ["infantry", "cavalry", "archer"]}
                 accumulated_costs = {t: [{"Satin": 0, "Threads": 0, "Vision": 0} for _ in range(2)] for t in ["infantry", "cavalry", "archer"]}
-                starting_gov = copy.deepcopy(current_gov)
 
-                def run_gov_isolated_simulation(gov_state):
-                    """Injects the baseline battle report stats modified by Governor Gear scaling + Set Bonuses."""
+                def get_class_gov_total_pct(piece_pair):
+                    p1, p2 = piece_pair[0], piece_pair[1]
+                    s1 = sum(gov_atlas["deltas"][:p1+1])
+                    s2 = sum(gov_atlas["deltas"][:p2+1])
+                    set_b = gov_atlas["set_bonuses"][min(p1, p2)]
+                    return s1 + s2 + set_b
+
+                def build_gov_modified_my_stats(gov_state):
+                    """Applies only the net delta (- starting gov gear + tested gov gear) across all 4 stats."""
                     my_stats_matrix = np.array([
                         [my_ia, my_id, my_il, my_ih], 
                         [my_ca, my_cd, my_cl, my_ch], 
                         [my_aa, my_ad, my_al, my_ah]
-                    ])
+                    ], dtype=float)
+                    
+                    for r, troop in enumerate(["infantry", "cavalry", "archer"]):
+                        base_boost = get_class_gov_total_pct(starting_gov[troop])
+                        new_boost = get_class_gov_total_pct(gov_state[troop])
+                        delta_boost = new_boost - base_boost
+                        
+                        # Governor Gear + Set Bonuses apply equally to Atk, Def, Leth, and HP
+                        my_stats_matrix[r, 0] += delta_boost
+                        my_stats_matrix[r, 1] += delta_boost
+                        my_stats_matrix[r, 2] += delta_boost
+                        my_stats_matrix[r, 3] += delta_boost
+                        
+                    return my_stats_matrix
+
+                def evaluate_gov_matchup(my_stats_matrix, runs=gv_precision):
                     opp_stats_matrix = np.array([
                         [opp_ia, opp_id, opp_il, opp_ih],
                         [opp_ca, opp_cd, opp_cl, opp_ch],
                         [opp_aa, opp_ad, opp_al, opp_ah]
-                    ])
+                    ], dtype=float)
                     
-                    target_matrix = my_stats_matrix if opt_role == "Rally Attacker" else opp_stats_matrix
-                    
-                    # Process Gov Gear Stats + Set Bonuses
-                    for r, troop in enumerate(["infantry", "cavalry", "archer"]):
-                        piece_1_lvl = gov_state[troop][0]
-                        piece_2_lvl = gov_state[troop][1]
-                        
-                        # 1. Base Stats
-                        stat1_pct = sum(gov_atlas["deltas"][:piece_1_lvl+1])
-                        stat2_pct = sum(gov_atlas["deltas"][:piece_2_lvl+1])
-                        
-                        # 2. Cumulative Set Bonus Calculation (Key Mechanic!)
-                        # Set bonus is based on the lowest tier between the two pieces
-                        min_tier = min(piece_1_lvl, piece_2_lvl)
-                        set_bonus_pct = gov_atlas["set_bonuses"][min_tier]
-                        
-                        total_boost = stat1_pct + stat2_pct + set_bonus_pct
-                        
-                        # Apply equally to all 4 fundamental stats
-                        target_matrix[r, 0] += total_boost # Atk
-                        target_matrix[r, 1] += total_boost # Def
-                        target_matrix[r, 2] += total_boost # Leth
-                        target_matrix[r, 3] += total_boost # HP
+                    my_joiners = [
+                        st.session_state.get("g_my_j1", "None"),
+                        st.session_state.get("g_my_j2", "None"),
+                        st.session_state.get("g_my_j3", "None"),
+                        st.session_state.get("g_my_j4", "None")
+                    ]
+                    opp_joiners = [
+                        st.session_state.get("g_opp_j1", "None"),
+                        st.session_state.get("g_opp_j2", "None"),
+                        st.session_state.get("g_opp_j3", "None"),
+                        st.session_state.get("g_opp_j4", "None")
+                    ]
 
-                    my_march = TroopSide([my_inf, my_cav, my_arc], my_stats_matrix, [my_h1, my_h2, my_h3], ["None"]*4)
-                    opp_march = TroopSide([opp_inf, opp_cav, opp_arc], opp_stats_matrix, [opp_h1, opp_h2, opp_h3], ["None"]*4)
+                    my_march = TroopSide([my_inf, my_cav, my_arc], my_stats_matrix, [my_h1, my_h2, my_h3], my_joiners)
+                    opp_march = TroopSide([opp_inf, opp_cav, opp_arc], opp_stats_matrix, [opp_h1, opp_h2, opp_h3], opp_joiners)
                     
                     attacker_side = my_march if opt_role == "Rally Attacker" else opp_march
                     defender_side = opp_march if opt_role == "Rally Attacker" else my_march
                     
-                    total_surviving_target = 0
-                    for _ in range(gv_precision):
-                        res = kingshot_multirally_sim2([attacker_side.clone()], defender_side.clone())
-                        total_surviving_target += np.sum(res[1][0]['attacker_surviving']) if opt_role == "Rally Attacker" else np.sum(res[0].troops)
-                            
-                    return total_surviving_target / gv_precision
+                    wins = 0
+                    my_surv_total = 0.0
+                    opp_surv_total = 0.0
+                    
+                    for _ in range(runs):
+                        final_g, logs = kingshot_multirally_sim2([attacker_side.clone()], defender_side.clone())
+                        att_rem = float(np.sum(logs[0]['attacker_surviving']))
+                        def_rem = float(np.sum(final_g.troops))
+                        
+                        if opt_role == "Rally Attacker":
+                            my_surv_total += att_rem
+                            opp_surv_total += def_rem
+                            if def_rem <= 0:
+                                wins += 1
+                        else:
+                            my_surv_total += def_rem
+                            opp_surv_total += att_rem
+                            if def_rem > 0:
+                                wins += 1
+                                
+                    win_prob_pct = (wins / float(runs)) * 100.0
+                    avg_my_surv = my_surv_total / float(runs)
+                    avg_opp_surv = opp_surv_total / float(runs)
+                    combat_score = (win_prob_pct * 500.0) + avg_my_surv - avg_opp_surv
+                    return combat_score, win_prob_pct, avg_my_surv, avg_opp_surv
 
-                # -------------------------------------------------------------------------
-                # --- GREEDY SEARCH LOOP WITH TRIPLE SQUARED SCARCITY ---
-                # -------------------------------------------------------------------------
-                for action_step in range(1, gv_max_actions + 1):
-                    gv_status.markdown(f"**🔍 Calculating Optimal Governor Tier Step #{action_step}...**")
-                    
-                    control_surv = run_gov_isolated_simulation(running_gov)
+                # 1. Measure Baseline (BEFORE Upgrades)
+                gv_status.markdown("**📊 Evaluating Baseline Matchup (Before Governor Gear Upgrades)...**")
+                base_my_stats = build_gov_modified_my_stats(starting_gov)
+                base_score, gv_before_win, gv_before_my_surv, gv_before_opp_surv = evaluate_gov_matchup(base_my_stats, runs=gv_precision)
+                gv_progress.progress(0.20)
+
+                # 2. Pre-Compute 4-Stat All-Around Gradient per Troop Class
+                gv_status.markdown("**🧭 Measuring Governor Gear Combat Gradients (Atk+Def+Leth+HP per Class)...**")
+                gov_class_sensitivity = {}
+                test_bump = 30.0
+                for r, t_name in enumerate(["infantry", "cavalry", "archer"]):
+                    bumped_stats = np.copy(base_my_stats)
+                    bumped_stats[r, :] += test_bump  # Boost all 4 stats equally
+                    b_score, _, _, _ = evaluate_gov_matchup(bumped_stats, runs=gv_precision)
+                    gov_class_sensitivity[t_name] = max(1.0, (b_score - base_score) / test_bump)
+                    gv_progress.progress(0.20 + (0.15 * (r + 1)))
+
+                # 3. Exhaustive Greedy Loop with Triple Squared Scarcity & Set Bonus Awareness
+                action_step = 0
+                max_tier_idx = len(gov_names) - 1
+                while True:
+                    action_step += 1
+                    if action_step > 1000:
+                        break
+                    if action_step % 5 == 1:
+                        gv_status.markdown(f"**🔍 Depleting Governor Materials | Step #{action_step}...**")
+
                     candidates = []
-                    
-                    # Triple Scarcity Weighting
                     s_pool = max(1, gv_wallet["Satin"])
                     t_pool = max(1, gv_wallet["Threads"])
                     v_pool = max(1, gv_wallet["Vision"])
@@ -2228,8 +2311,9 @@ else:
                     w_vision = 1.0 / (v_pool ** 2)
 
                     for troop in ["infantry", "cavalry", "archer"]:
+                        curr_total_boost = get_class_gov_total_pct(running_gov[troop])
                         for slot_idx, current_lvl in enumerate(running_gov[troop]):
-                            if current_lvl >= 58: # Max level cap (Red T6 3★)
+                            if current_lvl >= max_tier_idx:
                                 continue 
                                 
                             target_lvl = current_lvl + 1
@@ -2237,28 +2321,31 @@ else:
                             req_t = gov_atlas["threads"][target_lvl]
                             req_v = gov_atlas["vision"][target_lvl]
                             
-                            if gv_wallet["Satin"] >= req_s and gv_wallet["Threads"] >= req_t and gv_wallet["Vision"] >= req_v:
-                                test_gov = copy.deepcopy(running_gov)
-                                test_gov[troop][slot_idx] += 1
+                            if gv_wallet["Satin"] >= req_s and gv_wallet["Threads"] >= req_t and gv_wallet["Vision"] >= req_v and (req_s > 0 or req_t > 0 or req_v > 0):
+                                test_pair = list(running_gov[troop])
+                                test_pair[slot_idx] = target_lvl
+                                new_total_boost = get_class_gov_total_pct(test_pair)
                                 
-                                test_surv = run_gov_isolated_simulation(test_gov)
-                                troops_saved = max(0.001, test_surv - control_surv)
+                                # Exact total stat delta including any triggered Set Bonus jump!
+                                total_stat_delta = max(0.001, new_total_boost - curr_total_boost)
+                                base_piece_delta = gov_atlas["deltas"][target_lvl]
+                                set_bonus_delta = max(0.0, total_stat_delta - base_piece_delta)
                                 
-                                # Budget Normalization Denominator
+                                combat_gain = total_stat_delta * gov_class_sensitivity[troop]
                                 resource_score = (req_s * w_satin) + (req_t * w_threads) + (req_v * w_vision)
-                                efficiency = troops_saved / max(1e-9, resource_score)
+                                efficiency = combat_gain / max(1e-12, resource_score)
                                 
                                 candidates.append({
-                                    "troop": troop, "slot": slot_idx, "next_lvl": target_lvl,
+                                    "troop": troop, "slot": slot_idx,
+                                    "from_lvl": current_lvl, "next_lvl": target_lvl,
                                     "cost_s": req_s, "cost_t": req_t, "cost_v": req_v,
-                                    "efficiency": efficiency, "saved": troops_saved
+                                    "base_delta": base_piece_delta, "set_delta": set_bonus_delta,
+                                    "total_delta": total_stat_delta, "efficiency": efficiency
                                 })
 
                     if not candidates:
-                        gv_progress.progress(1.0)
                         break
                         
-                    # Commit the best step
                     candidates.sort(key=lambda x: x["efficiency"], reverse=True)
                     winner = candidates[0]
                     
@@ -2266,20 +2353,20 @@ else:
                     gv_wallet["Threads"] -= winner["cost_t"]
                     gv_wallet["Vision"] -= winner["cost_v"]
                     
-                    running_gov[winner["troop"]][winner["slot"]] += 1
+                    running_gov[winner["troop"]][winner["slot"]] = winner["next_lvl"]
                     
-                    # Consolidate outputs
-                    lvl_idx = winner["next_lvl"]
-                    stat_gain_amt = gov_atlas["deltas"][lvl_idx]
-                    
-                    # Log base stat gains. Set bonus will be calculated globally at the end for display.
-                    accumulated_gains[winner["troop"]][winner["slot"]] += stat_gain_amt
+                    accumulated_gains[winner["troop"]][winner["slot"]] += winner["base_delta"]
                     accumulated_costs[winner["troop"]][winner["slot"]]["Satin"] += winner["cost_s"]
                     accumulated_costs[winner["troop"]][winner["slot"]]["Threads"] += winner["cost_t"]
                     accumulated_costs[winner["troop"]][winner["slot"]]["Vision"] += winner["cost_v"]
                     
                     gov_roadmap.append(winner)
-                    gv_progress.progress(action_step / gv_max_actions)
+
+                # 4. Final Verification Simulation (AFTER Upgrades)
+                gv_progress.progress(0.90)
+                gv_status.markdown("**🏁 Running Final Before vs. After Win Probability Verification...**")
+                final_my_stats = build_gov_modified_my_stats(running_gov)
+                _, gv_after_win, gv_after_my_surv, gv_after_opp_surv = evaluate_gov_matchup(final_my_stats, runs=gv_precision)
 
                 gv_progress.empty()
                 gv_status.empty()
@@ -2288,8 +2375,16 @@ else:
                 # --- CONSOLIDATE AND DISPLAY FINAL BLUEPRINT ---
                 # -------------------------------------------------------------------------
                 if gov_roadmap:
-                    st.success("🎯 Optimal Governor Gear Roadmap Compiled Successfully!")
+                    st.success(f"🎯 Exhaustive Governor Gear Roadmap Compiled! Executed **{len(gov_roadmap)} total tier upgrades** until materials ran out.")
                     
+                    # --- BEFORE VS AFTER WIN PROBABILITY & SURVIVOR IMPACT BANNER ---
+                    st.markdown("### 📈 Before vs. After Governor Gear Combat Impact")
+                    g_imp1, g_imp2, g_imp3, g_imp4 = st.columns(4)
+                    g_imp1.metric("Before Win Probability", f"{gv_before_win:.1f}%")
+                    g_imp2.metric("After Win Probability", f"{gv_after_win:.1f}%", f"{gv_after_win - gv_before_win:+.1f}% Win Chance")
+                    g_imp3.metric("Your Avg Survivors (Before ➔ After)", f"{gv_after_my_surv:,.0f}", f"{gv_after_my_surv - gv_before_my_surv:+,.0f} Troops")
+                    g_imp4.metric("Rival Avg Survivors (Before ➔ After)", f"{gv_after_opp_surv:,.0f}", f"{gv_after_opp_surv - gv_before_opp_surv:+,.0f} Enemy Troops", delta_color="inverse")
+
                     consolidated_rows = []
                     for troop in ["infantry", "cavalry", "archer"]:
                         for slot_idx in range(2):
@@ -2298,46 +2393,60 @@ else:
                             
                             if start_l != end_l:
                                 costs = accumulated_costs[troop][slot_idx]
-                                cost_display = f"+{costs['Satin']:,} Satin"
-                                if costs['Threads'] > 0: cost_display += f", +{costs['Threads']:,} Threads"
-                                if costs['Vision'] > 0: cost_display += f", +{costs['Vision']:,} Vision"
+                                cost_parts = [f"{costs['Satin']:,} Satin"]
+                                if costs['Threads'] > 0: cost_parts.append(f"{costs['Threads']:,} Threads")
+                                if costs['Vision'] > 0: cost_parts.append(f"{costs['Vision']:,} Vision")
+                                cost_display = ", ".join(cost_parts)
                                 
                                 stat_gain = accumulated_gains[troop][slot_idx]
-                                
-                                # Format visual names
                                 str_start = gov_names[start_l]
                                 str_end = gov_names[end_l]
                                 
                                 consolidated_rows.append({
                                     "Target Piece": f"{troop.capitalize()} Piece #{slot_idx + 1}",
-                                    "Tier Jump": f"{str_start} ➔ {str_end}",
+                                    "Tier Jump": f"{str_start} ➔ {str_end} (+{end_l - start_l} Tiers)",
                                     "Required Resources": cost_display,
-                                    "Base Stat Yield": f"+{stat_gain:.2f}%"
+                                    "Base Stat Yield (All 4 Stats)": f"+{stat_gain:.2f}%"
                                 })
                                 
                     st.subheader("📋 Consolidated Governor Upgrade Action Plan")
-                    if consolidated_rows:
-                        st.dataframe(pd.DataFrame(consolidated_rows), hide_index=True, use_container_width=True)
-                        
-                        # Highlight Set Bonus changes if any occurred
-                        st.markdown("#### ⚡ Set Bonus Impacts")
-                        set_bonus_text = []
-                        for troop in ["infantry", "cavalry", "archer"]:
-                            old_min = min(starting_gov[troop][0], starting_gov[troop][1])
-                            new_min = min(running_gov[troop][0], running_gov[troop][1])
-                            if old_min != new_min:
-                                old_bonus = gov_atlas["set_bonuses"][old_min]
-                                new_bonus = gov_atlas["set_bonuses"][new_min]
-                                set_bonus_text.append(f"- **{troop.capitalize()} Set:** Upgraded from +{old_bonus}% to **+{new_bonus}%**")
-                        
-                        if set_bonus_text:
-                            for text in set_bonus_text:
-                                st.success(text)
-                        else:
-                            st.info("No Set Bonus thresholds were crossed during this specific roadmap calculation.")
-                            
+                    st.dataframe(pd.DataFrame(consolidated_rows), hide_index=True, use_container_width=True)
+                    
+                    # Highlight Set Bonus changes if any occurred
+                    st.markdown("#### ⚡ Set Bonus Impacts")
+                    set_bonus_text = []
+                    for troop in ["infantry", "cavalry", "archer"]:
+                        old_min = min(starting_gov[troop][0], starting_gov[troop][1])
+                        new_min = min(running_gov[troop][0], running_gov[troop][1])
+                        if old_min != new_min:
+                            old_bonus = gov_atlas["set_bonuses"][old_min]
+                            new_bonus = gov_atlas["set_bonuses"][new_min]
+                            if new_bonus > old_bonus:
+                                set_bonus_text.append(f"- **{troop.capitalize()} Set Bonus Unlocked:** Upgraded from +{old_bonus:.2f}% to **+{new_bonus:.2f}%** (+{new_bonus - old_bonus:.2f}% across all 4 stats)")
+                    
+                    if set_bonus_text:
+                        for text in set_bonus_text:
+                            st.success(text)
                     else:
-                        st.info("No transitions occurred. Upgrades analyzed were outvalued by core budget limits.")
+                        st.info("No new Set Bonus thresholds were crossed during this specific roadmap calculation.")
+
+                    with st.expander(f"📜 View Chronological Step-by-Step Governor Gear Sequence ({len(gov_roadmap)} Steps)", expanded=False):
+                        gv_step_rows = []
+                        for idx_s, step_item in enumerate(gov_roadmap, 1):
+                            c_parts = [f"{step_item['cost_s']:,} Satin"]
+                            if step_item['cost_t'] > 0: c_parts.append(f"{step_item['cost_t']:,} Threads")
+                            if step_item['cost_v'] > 0: c_parts.append(f"{step_item['cost_v']:,} Vision")
+                            gain_str = f"+{step_item['base_delta']:.2f}% Base"
+                            if step_item['set_delta'] > 0:
+                                gain_str += f" (+{step_item['set_delta']:.2f}% Set Bonus!)"
+                            gv_step_rows.append({
+                                "Step #": idx_s,
+                                "Piece": f"{step_item['troop'].capitalize()} Piece #{step_item['slot'] + 1}",
+                                "Tier Step": f"{gov_names[step_item['from_lvl']]} ➔ {gov_names[step_item['next_lvl']]}",
+                                "Stat Yield (All 4)": gain_str,
+                                "Cost": ", ".join(c_parts)
+                            })
+                        st.dataframe(pd.DataFrame(gv_step_rows), hide_index=True, use_container_width=True)
                         
                     st.markdown("#### 👛 Remaining Asset Reserves After Processing")
                     r_g1, r_g2, r_g3 = st.columns(3)
@@ -2345,9 +2454,7 @@ else:
                     r_g2.metric("Remaining Gilded Threads", f"{gv_wallet['Threads']:,}")
                     r_g3.metric("Remaining Artisan's Vision", f"{gv_wallet['Vision']:,}")
                 else:
-                    st.error("❌ The algorithm was unable to calculate an upgrade link. Verify your input balances.")
-
-
+                    st.error("❌ Not enough Satin, Gilded Threads, or Artisan's Vision in your inventory to afford any single tier upgrade.")
                         # --- TAB 7- Manual ---
     # =========================================================================
 with tab_manual:
