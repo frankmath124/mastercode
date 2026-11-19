@@ -460,7 +460,7 @@ else:
                 st.subheader("Garrison Target Defenses")
                 s_gc1, s_gc2 = st.columns(2)
                 s_g_tier = s_gc1.selectbox("Garrison Troop Tier", range(1, 12), index=10, key="s_gtier") 
-                s_g_tg = s_gc2.selectbox("Garrison Troop TG Level", range(0, 6), index=5, key="s_gtg")       
+                s_g_tg = s_gc2.selectbox("Garrison Troop TG Level", range(0, 9), index=5, key="s_gtg")       
                 
                 s_g_input_style = st.radio("Garrison Troop Input Style", ("Raw Counts", "Capacity + Ratios"), key="s_g_style")
                 if s_g_input_style == "Raw Counts":
@@ -523,7 +523,7 @@ else:
                             st.markdown("**Wave Base Metrics**")
                             swc1, swc2 = st.columns(2)
                             sw_tier = swc1.selectbox("Troop Tier", range(1, 12), index=9, key=f"s_wtier_{i}") 
-                            sw_tg = swc2.selectbox("Troop TG Level", range(0, 6), index=5, key=f"s_wtg_{i}")       
+                            sw_tg = swc2.selectbox("Troop TG Level", range(0, 9), index=5, key=f"s_wtg_{i}")       
                             
                             sw_input_style = st.radio("Troop Input Type", ("Raw Counts", "Rally Size + Ratios"), key=f"s_wstyle_{i}")
                             if sw_input_style == "Raw Counts":

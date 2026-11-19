@@ -10,26 +10,31 @@ except FileNotFoundError:
     TROOP_DB = None
 
 def get_base_stats(troop_type, tier, tg_level):
-    """Fetches [Attack, Defense, Lethality, Health] from troop_stats.csv or falls back cleanly."""
+    """Fetches [Attack, Defense, Lethality, Health] from troop_stats.csv or exact TG0-TG8 table."""
+    vec = None
     if TROOP_DB is not None:
         try:
             row = TROOP_DB[(TROOP_DB['Type'] == troop_type) & 
                            (TROOP_DB['Tier'] == tier) & 
                            (TROOP_DB['TG'] == tg_level)]
             if not row.empty:
-                return row[['Attack', 'Defense', 'Lethality', 'Health']].values[0].astype(float)
+                vec = row[['Attack', 'Defense', 'Lethality', 'Health']].values[0].astype(float)
         except Exception:
             pass
 
-    base_t10_tg5 = {
-        'infantry': np.array([597.0, 10.0, 10.0, 1790.0]),
-        'cavalry':  np.array([1790.0, 10.0, 10.0, 597.0]),
-        'archers':  np.array([2387.0, 10.0, 10.0, 448.0])
-    }
-    scale = (1.20 ** (tier - 10)) * (1.045 ** (tg_level - 5))
-    vec = base_t10_tg5.get(troop_type, base_t10_tg5['infantry']).copy()
-    vec[0] *= scale
-    vec[3] *= scale
+    if vec is None:
+        clamped_tg = max(0, min(8, int(tg_level)))
+        base_vec = np.array(EXACT_T10_TG_STATS.get(troop_type, EXACT_T10_TG_STATS['infantry'])[clamped_tg], dtype=float)
+        tier_scale = 1.15 ** (tier - 10)  # Clean scaling for T9 / T11 if not in CSV
+        vec = base_vec * tier_scale
+
+    # Apply TG8 passive base stat bonuses directly from skill descriptions
+    if tg_level >= 8:
+        if troop_type == 'infantry':
+            vec[1] *= 1.04  # Immortalists: +4% basic Infantry Defense
+        elif troop_type == 'archers':
+            vec[0] *= 1.04  # Truegold Wind: +4% basic Archer Attack
+
     return vec
 
 class TroopSide:
@@ -186,6 +191,39 @@ class SideCombatState:
                     round_reduct *= max(0.0, 1.0 - val)
                     
         return round_dmg_bonus, class_dmg_bonus, enemy_taken_bonus, round_reduct
+    
+def apply_tg_troop_skills(attacker_idx, target_idx, att_tg, def_tg, base_dmg):
+    """Applies TG3/TG5/TG8 active troop skills during each squad's strike."""
+    dmg = base_dmg
+
+    # --- Attacker Offensive TG Skills ---
+    if attacker_idx == 1 and att_tg >= 3:
+        # Cavalry: Assault Lance (TG3 Lv1 / TG5 Lv2 double damage proc)
+        lance_chance = 0.15 if att_tg >= 5 else 0.10
+        if np.random.rand() < lance_chance:
+            dmg *= 2.0
+
+    elif attacker_idx == 2 and att_tg >= 3:
+        # Archers: Howling Wind (TG3 Lv1 / TG5 Lv2) + TG8 Truegold Wind (+25% extra dmg when active)
+        wind_chance = 0.25 if att_tg >= 5 else 0.15
+        if np.random.rand() < wind_chance:
+            wind_mult = 1.75 if att_tg >= 8 else 1.50
+            dmg *= wind_mult
+
+    # --- Defender Defensive TG Skills ---
+    if target_idx == 0 and def_tg >= 3:
+        # Infantry: Unyielding Shield (TG3 Lv1 / TG5 Lv2) + TG8 Immortalists (-10% extra dmg when active)
+        shield_chance = 0.375 if def_tg >= 5 else 0.25
+        if np.random.rand() < shield_chance:
+            shield_reduct = 0.40 if def_tg >= 8 else (0.30 if def_tg >= 5 else 0.20)
+            dmg *= (1.0 - shield_reduct)
+
+    elif target_idx == 1 and def_tg >= 8:
+        # Cavalry: TG8 Warding Impaler (10% chance of taking half damage when under attack)
+        if np.random.rand() < 0.10:
+            dmg *= 0.50
+
+    return dmg
 
 # =========================================================================
 # --- COMPLETE SIMULATOR ENGINE ---
@@ -283,6 +321,7 @@ def kingshot_multirally_sim2(rally_waves, garrison, max_rounds=200):
 
                     dmg_a = (army_factor_a * (a_att_power[idx] / d_def_pool[d_target]) * type_bonus_a * total_dmg_mult_a) / 100.0
                     dmg_a *= d_reduct
+                    dmg_a = apply_tg_troop_skills(idx, d_target, attacker.tg_level, current_garrison.tg_level, dmg_a)  # <-- ADD THIS
                     if np.random.rand() < d_state.dodge: dmg_a *= 0.5
                     d_troops[d_target] = max(0.0, d_troops[d_target] - math.ceil(dmg_a))
 
@@ -302,6 +341,7 @@ def kingshot_multirally_sim2(rally_waves, garrison, max_rounds=200):
 
                     dmg_d = (army_factor_d * (d_att_power[idx] / a_def_pool[a_target]) * type_bonus_d * total_dmg_mult_d) / 100.0
                     dmg_d *= a_reduct
+                    dmg_d = apply_tg_troop_skills(idx, a_target, current_garrison.tg_level, attacker.tg_level, dmg_d)  # <-- ADD THIS
                     if np.random.rand() < a_state.dodge: dmg_d *= 0.5
                     a_troops[a_target] = max(0.0, a_troops[a_target] - math.ceil(dmg_d))
 
