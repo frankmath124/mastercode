@@ -104,7 +104,8 @@ def load_hero_db():
     db['Yang'] = {'skill1': {'type': 'periodic_proc', 'interval': 2, 'effect': 'dmg', 'val': 1.00},'skill2': {'type': 'proc', 'chance': 0.40, 'effect': 'dmg', 'val': 1.00},'skill3': {'type': 'proc', 'chance': 0.40, 'effect': 'dmg', 'val': 0.50},'widget': {'has_widget': True, 'scenario': 'rally', 'type': 'lethality', 'val': 0.15} }
 
     # Joiners
-    db['Gordon'] = {'skill1': {'type': 'none'}, 'skill2': {'type': 'none'}, 'skill3': {'type': 'none'}, 'widget': {'has_widget': False} db['Fahd'] = {'skill1': {'type': 'enemy_dmg_down', 'val': 0.20}, 'skill2': {'type': 'none'}, 'skill3': {'type': 'none'}, 'widget': {'has_widget': False}}}
+    db['Gordon'] = {'skill1': {'type': 'none'}, 'skill2': {'type': 'none'}, 'skill3': {'type': 'none'}, 'widget': {'has_widget': False}}
+    db['Fahd'] = {'skill1': {'type': 'enemy_dmg_down', 'val': 0.20}, 'skill2': {'type': 'none'}, 'skill3': {'type': 'none'}, 'widget': {'has_widget': False}}
     db['Chenko'] = {'skill1': {'type': 'none'}, 'skill2': {'type': 'none'}, 'skill3': {'type': 'none'}, 'widget': {'has_widget': False}}
     db['Yaenwoo'] = {'skill1': {'type': 'none'}, 'skill2': {'type': 'none'}, 'skill3': {'type': 'none'}, 'widget': {'has_widget': False}}
     db['Howard'] = {'skill1': {'type': 'dmg_reduction', 'val': 0.20}, 'skill2': {'type': 'enemy_atk_down', 'val': 0.20}, 'skill3': {'type': 'none'}, 'widget': {'has_widget': False}}
