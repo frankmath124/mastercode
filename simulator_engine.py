@@ -99,20 +99,12 @@ def load_hero_db():
     db['Thrud'] = {'skill1': [{'type': 'dmg_reduction', 'val': 0.15}, {'type': 'class_dmg_buff', 'buffs': [0.15, 0.0, 0.15]}], 'skill2': {'type': 'proc', 'chance': 0.20, 'effect': 'dmg', 'val': 1.00}, 'skill3': [{'type': 'periodic_proc', 'interval': 2, 'effect': 'dmg', 'val': 0.25}, {'type': 'periodic_proc', 'interval': 2, 'effect': 'dmg_reduction', 'val': 0.25, 'duration': 2}], 'widget': {'has_widget': True, 'scenario': 'rally', 'type': 'lethality', 'val': 0.15}}
 
     # --- NEW HEROES: SOPHIE, TRITON, YANG ---
-    db['Sophie'] = {
-        'skill1': {'type': 'proc', 'chance': 0.40, 'effect': 'dmg_reduction', 'val': 0.50}, 'skill2': {'type': 'periodic_proc', 'interval': 2, 'target_class': 1, 'effect': 'dmg', 'val': 2.00},'skill3': {'type': 'enemy_taken_up', 'val': 0.75}, 'widget': {'has_widget': True, 'scenario': 'rally', 'type': 'lethality', 'val': 0.15}
-    }
+    db['Sophie'] = {'skill1': {'type': 'proc', 'chance': 0.40, 'effect': 'dmg_reduction', 'val': 0.50}, 'skill2': {'type': 'periodic_proc', 'interval': 2, 'target_class': 1, 'effect': 'dmg', 'val': 2.00},'skill3': {'type': 'enemy_taken_up', 'val': 0.75}, 'widget': {'has_widget': True, 'scenario': 'rally', 'type': 'lethality', 'val': 0.15}}
     db['Triton'] = {'skill1': {'type': 'defense', 'val': 0.25},'skill2': {'type': 'dmg', 'val': 0.30},'skill3': {'type': 'class_dmg_buff', 'buffs': [0.20, 0.30, 0.30]},'widget': {'has_widget': True, 'scenario': 'garrison', 'type': 'defense', 'val': 0.15}}
-    db['Yang'] = {
-        'skill1': {'type': 'periodic_proc', 'interval': 2, 'effect': 'dmg', 'val': 1.00},  # Avalanche: Additional strike every 4 turns for 100% damage[cite: 16]
-        'skill2': {'type': 'proc', 'chance': 0.40, 'effect': 'dmg', 'val': 1.00},         # Ice Zone: Archers 40% chance of 100% extra damage[cite: 16]
-        'skill3': {'type': 'proc', 'chance': 0.40, 'effect': 'dmg', 'val': 0.50},         # Ambush: 40% chance of dealing increased damage[cite: 16]
-        'widget': {'has_widget': True, 'scenario': 'rally', 'type': 'lethality', 'val': 0.15} # +15% Lethality when attacking rally
-    }
+    db['Yang'] = {'skill1': {'type': 'periodic_proc', 'interval': 2, 'effect': 'dmg', 'val': 1.00},'skill2': {'type': 'proc', 'chance': 0.40, 'effect': 'dmg', 'val': 1.00},'skill3': {'type': 'proc', 'chance': 0.40, 'effect': 'dmg', 'val': 0.50},'widget': {'has_widget': True, 'scenario': 'rally', 'type': 'lethality', 'val': 0.15} }
 
     # Joiners
-    db['Gordon'] = {'skill1': {'type': 'none'}, 'skill2': {'type': 'none'}, 'skill3': {'type': 'none'}, 'widget': {'has_widget': False}}
-    db['Fahd'] = {'skill1': {'type': 'enemy_dmg_down', 'val': 0.20}, 'skill2': {'type': 'none'}, 'skill3': {'type': 'none'}, 'widget': {'has_widget': False}}
+    db['Gordon'] = {'skill1': {'type': 'none'}, 'skill2': {'type': 'none'}, 'skill3': {'type': 'none'}, 'widget': {'has_widget': False} db['Fahd'] = {'skill1': {'type': 'enemy_dmg_down', 'val': 0.20}, 'skill2': {'type': 'none'}, 'skill3': {'type': 'none'}, 'widget': {'has_widget': False}}}
     db['Chenko'] = {'skill1': {'type': 'none'}, 'skill2': {'type': 'none'}, 'skill3': {'type': 'none'}, 'widget': {'has_widget': False}}
     db['Yaenwoo'] = {'skill1': {'type': 'none'}, 'skill2': {'type': 'none'}, 'skill3': {'type': 'none'}, 'widget': {'has_widget': False}}
     db['Howard'] = {'skill1': {'type': 'dmg_reduction', 'val': 0.20}, 'skill2': {'type': 'enemy_atk_down', 'val': 0.20}, 'skill3': {'type': 'none'}, 'widget': {'has_widget': False}}
