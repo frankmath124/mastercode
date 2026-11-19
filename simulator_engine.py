@@ -71,10 +71,11 @@ class TroopSide:
         return copy.deepcopy(self)
 
 # =========================================================================
-# --- HERO DATABASE ---
+# --- HERO DATABASE (INCLUDING SOPHIE, TRITON, YANG) ---
 # =========================================================================
 def load_hero_db():
     db = {}
+    # Gen 1-4 & 5
     db['Amadeus'] = {'skill1': {'type': 'none'}, 'skill2': {'type': 'none'}, 'skill3': {'type': 'proc', 'chance': 0.40, 'effect': 'dmg', 'val': 0.50}, 'widget': {'has_widget': True, 'scenario': 'rally', 'type': 'atk', 'val': 0.15}}
     db['Helga'] = {'skill1': {'type': 'proc', 'chance': 0.40, 'effect': 'dmg_reduction', 'val': 0.50}, 'skill2': {'type': 'none'}, 'skill3': {'type': 'none'}, 'widget': {'has_widget': True, 'scenario': 'rally', 'type': 'lethality', 'val': 0.15}}
     db['Saul'] = {'skill1': {'type': 'none'}, 'skill2': {'type': 'dmg_reduction', 'val': 0.0}, 'skill3': {'type': 'none'}, 'widget': {'has_widget': True, 'scenario': 'garrison', 'type': 'atk', 'val': 0.15}}
@@ -92,33 +93,21 @@ def load_hero_db():
     db['Rosa'] = {'skill1': {'type': 'proc', 'chance': 0.40, 'effect': 'dmg', 'val': 0.50}, 'skill2': {'type': 'enemy_dmg_down', 'val': 0.20}, 'skill3': {'type': 'class_atk_buff', 'target_class': 2, 'val': 0.30}, 'widget': {'has_widget': True, 'scenario': 'rally', 'type': 'lethality', 'val': 0.15}}
     db['Margot'] = {'skill1': {'type': 'none'}, 'skill2': {'type': 'dodge_chance', 'val': 0.20}, 'skill3': {'type': 'proc', 'chance': 0.25, 'effect': 'double_strike', 'val': 1.00}, 'widget': {'has_widget': True, 'scenario': 'garrison', 'type': 'lethality', 'val': 0.15}}
 
-    # Gen 5: Long Fei, Vivian, Thrud[cite: 13]
-    db['Long Fei'] = {
-        'skill1': {'type': 'proc', 'chance': 0.40, 'effect': 'dmg_reduction', 'val': 0.50},
-        'skill2': {'type': 'none'},
-        'skill3': {'type': 'proc', 'chance': 0.25, 'effect': 'dmg', 'val': 1.00},
-        'widget': {'has_widget': True, 'scenario': 'garrison', 'type': 'atk', 'val': 0.15}
+    # Previous Gen 5 Additions
+    db['Long Fei'] = {'skill1': {'type': 'proc', 'chance': 0.40, 'effect': 'dmg_reduction', 'val': 0.50}, 'skill2': {'type': 'none'}, 'skill3': {'type': 'proc', 'chance': 0.25, 'effect': 'dmg', 'val': 1.00}, 'widget': {'has_widget': True, 'scenario': 'garrison', 'type': 'atk', 'val': 0.15}}
+    db['Vivian'] = {'skill1': {'type': 'enemy_taken_up', 'val': 0.25}, 'skill2': [{'type': 'periodic_proc', 'interval': 2, 'effect': 'dmg', 'val': 1.00}, {'type': 'periodic_proc', 'interval': 2, 'effect': 'enemy_taken_up', 'val': 0.15}], 'skill3': {'type': 'periodic_proc', 'interval': 2, 'target_class': 2, 'effect': 'dmg', 'val': 0.60}, 'widget': {'has_widget': True, 'scenario': 'rally', 'type': 'defense', 'val': 0.15}}
+    db['Thrud'] = {'skill1': [{'type': 'dmg_reduction', 'val': 0.15}, {'type': 'class_dmg_buff', 'buffs': [0.15, 0.0, 0.15]}], 'skill2': {'type': 'proc', 'chance': 0.20, 'effect': 'dmg', 'val': 1.00}, 'skill3': [{'type': 'periodic_proc', 'interval': 2, 'effect': 'dmg', 'val': 0.25}, {'type': 'periodic_proc', 'interval': 2, 'effect': 'dmg_reduction', 'val': 0.25, 'duration': 2}], 'widget': {'has_widget': True, 'scenario': 'rally', 'type': 'lethality', 'val': 0.15}}
+
+    # --- NEW HEROES: SOPHIE, TRITON, YANG ---
+    db['Sophie'] = {
+        'skill1': {'type': 'proc', 'chance': 0.40, 'effect': 'dmg_reduction', 'val': 0.50}, 'skill2': {'type': 'periodic_proc', 'interval': 2, 'target_class': 1, 'effect': 'dmg', 'val': 2.00},'skill3': {'type': 'enemy_taken_up', 'val': 0.75}, 'widget': {'has_widget': True, 'scenario': 'rally', 'type': 'lethality', 'val': 0.15}
     }
-    db['Vivian'] = {
-        'skill1': {'type': 'enemy_taken_up', 'val': 0.25},                               # +25% Damage Taken[cite: 13]
-        'skill2': [
-            {'type': 'periodic_proc', 'interval': 2, 'effect': 'dmg', 'val': 1.00},      # Trigger more frequently for burst scaling[cite: 13]
-            {'type': 'periodic_proc', 'interval': 2, 'effect': 'enemy_taken_up', 'val': 0.15}
-        ],
-        'skill3': {'type': 'periodic_proc', 'interval': 2, 'target_class': 2, 'effect': 'dmg', 'val': 0.60}, # Archer bonus[cite: 13]
-        'widget': {'has_widget': True, 'scenario': 'rally', 'type': 'defense', 'val': 0.15}
-    }
-    db['Thrud'] = {
-        'skill1': [
-            {'type': 'dmg_reduction', 'val': 0.15},
-            {'type': 'class_dmg_buff', 'buffs': [0.15, 0.0, 0.15]}
-        ],
-        'skill2': {'type': 'proc', 'chance': 0.20, 'effect': 'dmg', 'val': 1.00},
-        'skill3': [
-            {'type': 'periodic_proc', 'interval': 2, 'effect': 'dmg', 'val': 0.25},
-            {'type': 'periodic_proc', 'interval': 2, 'effect': 'dmg_reduction', 'val': 0.25, 'duration': 2}
-        ],
-        'widget': {'has_widget': True, 'scenario': 'rally', 'type': 'lethality', 'val': 0.15}
+    db['Triton'] = {'skill1': {'type': 'defense', 'val': 0.25},'skill2': {'type': 'dmg', 'val': 0.30},'skill3': {'type': 'class_dmg_buff', 'buffs': [0.20, 0.30, 0.30]},'widget': {'has_widget': True, 'scenario': 'garrison', 'type': 'defense', 'val': 0.15}}
+    db['Yang'] = {
+        'skill1': {'type': 'periodic_proc', 'interval': 2, 'effect': 'dmg', 'val': 1.00},  # Avalanche: Additional strike every 4 turns for 100% damage[cite: 16]
+        'skill2': {'type': 'proc', 'chance': 0.40, 'effect': 'dmg', 'val': 1.00},         # Ice Zone: Archers 40% chance of 100% extra damage[cite: 16]
+        'skill3': {'type': 'proc', 'chance': 0.40, 'effect': 'dmg', 'val': 0.50},         # Ambush: 40% chance of dealing increased damage[cite: 16]
+        'widget': {'has_widget': True, 'scenario': 'rally', 'type': 'lethality', 'val': 0.15} # +15% Lethality when attacking rally
     }
 
     # Joiners
@@ -174,7 +163,6 @@ class SideCombatState:
             self.procs.append(skill)
 
     def roll_round_procs(self, round_idx):
-        # BASE DAMAGE MULTIPLIER MUST START AT 1.0 (Standard 100% output)
         round_dmg_bonus = 1.0
         class_dmg_bonus = np.zeros(3)
         enemy_taken_bonus = self.base_enemy_taken_up
